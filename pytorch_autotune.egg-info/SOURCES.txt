@@ -1,0 +1,12 @@
+LICENSE
+MANIFEST.in
+README.md
+requirements.txt
+setup.py
+pytorch_autotune/__init__.py
+pytorch_autotune/autotune.py
+pytorch_autotune.egg-info/PKG-INFO
+pytorch_autotune.egg-info/SOURCES.txt
+pytorch_autotune.egg-info/dependency_links.txt
+pytorch_autotune.egg-info/requires.txt
+pytorch_autotune.egg-info/top_level.txt
