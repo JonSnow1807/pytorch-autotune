@@ -1,13 +1,13 @@
 # PyTorch AutoTune
 
-🚀 **Automatic 4x training speedup for PyTorch models!**
+**Automatic 4x training speedup for PyTorch models!**
 
 [![PyPI version](https://badge.fury.io/py/pytorch-autotune.svg)](https://pypi.org/project/pytorch-autotune/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub](https://img.shields.io/github/stars/JonSnow1807/pytorch-autotune?style=social)](https://github.com/JonSnow1807/pytorch-autotune)
 [![Downloads](https://static.pepy.tech/badge/pytorch-autotune)](https://pepy.tech/project/pytorch-autotune)
 
-## 🎯 Features
+##Features
 
 - **4x Training Speedup**: Validated 4.06x speedup on NVIDIA T4
 - **Zero Configuration**: Automatic hardware detection and optimization
@@ -15,13 +15,13 @@
 - **Energy Efficient**: 36% reduction in training energy consumption
 - **Universal**: Works with any PyTorch model
 
-## 📦 Installation
+## Installation
 
 ```bash
 pip install pytorch-autotune
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ```python
 from pytorch_autotune import quick_optimize
@@ -50,7 +50,7 @@ for epoch in range(num_epochs):
         scaler.update()
 ```
 
-## 🎮 Advanced Usage
+## Advanced Usage
 
 ```python
 from pytorch_autotune import AutoTune
@@ -73,7 +73,7 @@ results = autotune.benchmark(sample_data, iterations=100)
 print(f"Speedup: {results['throughput']:.1f} iter/sec")
 ```
 
-## 📊 Benchmarks
+## Benchmarks
 
 Tested on NVIDIA Tesla T4 GPU with PyTorch 2.7.1:
 
@@ -91,7 +91,7 @@ Tested on NVIDIA Tesla T4 GPU with PyTorch 2.7.1:
 | Baseline | 324 | 4.7 | - |
 | AutoTune | 208 | 3.1 | **35.8%** |
 
-## 🔧 How It Works
+## How It Works
 
 AutoTune automatically detects your hardware and applies optimal combinations of:
 
@@ -115,7 +115,7 @@ AutoTune automatically detects your hardware and applies optimal combinations of
    - Channels-last memory format for CNNs
    - Optimal batch size detection
 
-## 🖥️ Supported Hardware
+## Supported Hardware
 
 | GPU | Speedup | Special Features |
 |-----|---------|-----------------|
@@ -125,7 +125,7 @@ AutoTune automatically detects your hardware and applies optimal combinations of
 | RTX 3090/4090 | 2.5-4x | FP16, TF32 |
 | H100 | 3.5-5x | FP8, BF16, TF32 |
 
-## 📚 API Reference
+## API Reference
 
 ### AutoTune Class
 
@@ -161,7 +161,7 @@ model, optimizer, scaler = quick_optimize(model, **kwargs)
 
 One-line optimization with automatic settings.
 
-## 💡 Tips for Best Performance
+## Tips for Best Performance
 
 1. **Use Latest PyTorch**: Version 2.0+ for torch.compile support
 2. **Batch Size**: Let AutoTune detect optimal batch size
@@ -169,7 +169,7 @@ One-line optimization with automatic settings.
 4. **First Epoch**: Will be slower due to compilation
 5. **Memory**: Use `optimizer.zero_grad(set_to_none=True)`
 
-## 📈 Real-World Examples
+## Real-World Examples
 
 ### Computer Vision
 
@@ -201,7 +201,7 @@ model, optimizer, scaler = autotune.optimize()
 # Result: 2.5x speedup
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Issue: First epoch is slow
 **Solution**: This is normal - torch.compile needs to compile the graph. Subsequent epochs will be fast.
@@ -221,7 +221,7 @@ torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 - PyTorch 2.0+
 - Compute-intensive model (not memory-bound)
 
-## 📚 Citation
+## Citation
 
 If you use PyTorch AutoTune in your research, please cite:
 
@@ -235,7 +235,7 @@ If you use PyTorch AutoTune in your research, please cite:
 }
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -245,7 +245,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 🗺️ Roadmap
+## Roadmap
 
 - [ ] Support for distributed training (DDP)
 - [ ] Automatic learning rate scheduling
@@ -254,24 +254,24 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [ ] Custom CUDA kernels for specific operations
 - [ ] Support for Apple Silicon (MPS)
 
-## 👨‍💻 Author
+## Author
 
 **Chinmay Shrivastava**
 - GitHub: [@JonSnow1807](https://github.com/JonSnow1807)
 - Email: cshrivastava2000@gmail.com
 - LinkedIn: [Connect with me](https://www.linkedin.com/in/cshrivastava/)
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - PyTorch team for torch.compile and AMP
 - NVIDIA for mixed precision training research
 - The open-source community for feedback and contributions
 
-## ⭐ Star History
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=JonSnow1807/pytorch-autotune&type=Date)](https://star-history.com/#JonSnow1807/pytorch-autotune&Date)
 
