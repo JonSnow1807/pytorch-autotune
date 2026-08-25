@@ -21,7 +21,7 @@ loss = result.step(x, y)      # train with the tuned setup
 
 No fixed configuration is right for every workload — that is a measured
 fact, not a slogan. From this repo's committed benchmark run
-([data](benchmarks/results/2026-08-25_a100-40gb_v200/)): `torch.compile`'s
+([data](https://github.com/JonSnow1807/pytorch-autotune/tree/main/benchmarks/results/2026-08-25_a100-40gb_v200/)): `torch.compile`'s
 default mode is within 4 % of optimal for ResNet-50 yet leaves **2.7×** on
 the table for small-batch ResNet-18 (CUDA-graph mode won both — by 1.04×
 on one, 2.7× on the other); fp16 beats
@@ -38,8 +38,8 @@ to what you already had.
 
 ## Measured results
 
-From [`benchmarks/suite.py`](benchmarks/suite.py) — committed output in
-[`benchmarks/results/2026-08-25_a100-40gb_v200/`](benchmarks/results/2026-08-25_a100-40gb_v200/)
+From [`benchmarks/suite.py`](https://github.com/JonSnow1807/pytorch-autotune/blob/main/benchmarks/suite.py) — committed output in
+[`benchmarks/results/2026-08-25_a100-40gb_v200/`](https://github.com/JonSnow1807/pytorch-autotune/tree/main/benchmarks/results/2026-08-25_a100-40gb_v200/)
 (clean clone `b4b0364`, A100-SXM4-40GB, torch 2.13.0+cu129, SM clocks locked
 at 1410 MHz, `budget="max"`). Full training steps (forward + loss + backward
 + optimizer); three baselines, all measured with the same protocol:
@@ -57,7 +57,7 @@ the honest headline column.** One deliberate caveat: PyTorch's default
 disables TF32 *matmuls*, so for matmul-dominated models this baseline is
 generous to the tuner — against an informed user's one-line TF32 fix the
 transformer win measures **2.55×**, not 6.65× (re-measured in
-[`benchmarks/falsify.py`](benchmarks/falsify.py); committed output in the
+[`benchmarks/falsify.py`](https://github.com/JonSnow1807/pytorch-autotune/blob/main/benchmarks/falsify.py); committed output in the
 results directory).
 ³ `torch.compile(model)` default mode on PyTorch-default fp32 — the "just
 use torch.compile" alternative. The tuner wins because it *also* picks
@@ -155,7 +155,7 @@ over compile-default. A fixed wrapper cannot know any of that.)
 ### Adversarially verified
 
 The committed numbers were attacked before release
-([`benchmarks/falsify.py`](benchmarks/falsify.py), output committed next to
+([`benchmarks/falsify.py`](https://github.com/JonSnow1807/pytorch-autotune/blob/main/benchmarks/falsify.py), output committed next to
 the data): every winner was re-measured in a **real fresh-batch training
 loop, rebuilt from scratch twice**, and reproduced within 1.5 % of its
 committed trial number; the baselines reproduced within 1.9 %; the fp16
