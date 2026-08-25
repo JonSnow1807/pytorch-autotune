@@ -22,8 +22,9 @@ loss = result.step(x, y)      # train with the tuned setup
 No fixed configuration is right for every workload — that is a measured
 fact, not a slogan. From this repo's committed benchmark run
 ([data](benchmarks/results/2026-08-25_a100-40gb_v200/)): `torch.compile`'s
-default mode is the right call for ResNet-50 but leaves **2.7×** on the
-table for small-batch ResNet-18 (where CUDA-graph mode wins); fp16 beats
+default mode is within 4 % of optimal for ResNet-50 yet leaves **2.7×** on
+the table for small-batch ResNet-18 (CUDA-graph mode won both — by 1.04×
+on one, 2.7× on the other); fp16 beats
 bf16 on one workload and loses on the next; on tiny models AMP *loses* to
 fp32 outright. v1 of this package was a fixed-heuristic wrapper and its own
 benchmarks caught it being slower than baseline at one shape. So v2
@@ -52,7 +53,12 @@ at 1410 MHz, `budget="max"`). Full training steps (forward + loss + backward
 ¹ TF32 disabled everywhere — the most generous framing, listed for
 comparability with historical claims.
 ² What an untuned user gets (cuDNN TF32 on — PyTorch's default). **This is
-the honest headline column.**
+the honest headline column.** One deliberate caveat: PyTorch's default
+disables TF32 *matmuls*, so for matmul-dominated models this baseline is
+generous to the tuner — against an informed user's one-line TF32 fix the
+transformer win measures **2.55×**, not 6.65× (re-measured in
+[`benchmarks/falsify.py`](benchmarks/falsify.py); committed output in the
+results directory).
 ³ `torch.compile(model)` default mode on PyTorch-default fp32 — the "just
 use torch.compile" alternative. The tuner wins because it *also* picks
 precision, CUDA-graph mode, memory format and the fused optimizer — it uses
@@ -125,6 +131,19 @@ note: reduce-overhead uses CUDA graphs - keep input shapes static.
 (That is the committed ResNet-18 search verbatim — note AMP alone does
 *nothing* at this shape, fp16 loses, and CUDA-graph mode is worth 2.7×
 over compile-default. A fixed wrapper cannot know any of that.)
+
+### Adversarially verified
+
+The committed numbers were attacked before release
+([`benchmarks/falsify.py`](benchmarks/falsify.py), output committed next to
+the data): every winner was re-measured in a **real fresh-batch training
+loop, rebuilt from scratch twice**, and reproduced within 1.5 % of its
+committed trial number; the baselines reproduced within 1.9 %; the fp16
+winner ran 60 timed-regime steps with **zero** GradScaler-skipped optimizer
+steps; and the tuned config trained a learnable task to convergence
+identically to the baseline. A parallel methodology audit (14 attack
+findings, each adversarially verified) produced two documentation fixes and
+no measurement defects.
 
 ### Caveats you should actually read
 
