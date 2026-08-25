@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pytorch-autotune",
-    version="2.0.0",
+    version="2.0.1",
     author="Chinmay Shrivastava",
     author_email="cshrivastava2000@gmail.com",
     description="Measurement-driven PyTorch training autotuner: tries precision/compile/memory-format configs on your model, keeps the fastest, never returns one slower than your baseline",

@@ -2,8 +2,9 @@
 
 **A real autotuner: it measures candidate training configurations on *your*
 model and batch — precision × `torch.compile` mode × memory format × fused
-optimizer — keeps the fastest, and is structurally incapable of returning a
-config slower than your baseline.**
+optimizer — keeps the measured winner (a 3 % noise floor breaks ties toward
+the cheaper config), and is structurally incapable of returning a config
+slower than your baseline.**
 
 [![CI](https://github.com/JonSnow1807/pytorch-autotune/actions/workflows/ci.yml/badge.svg)](https://github.com/JonSnow1807/pytorch-autotune/actions/workflows/ci.yml)
 [![PyPI version](https://badge.fury.io/py/pytorch-autotune.svg)](https://pypi.org/project/pytorch-autotune/)
@@ -22,9 +23,11 @@ loss = result.step(x, y)      # train with the tuned setup
 No fixed configuration is right for every workload — that is a measured
 fact, not a slogan. From this repo's committed benchmark run
 ([data](https://github.com/JonSnow1807/pytorch-autotune/tree/main/benchmarks/results/2026-08-25_a100-40gb_v200/)): `torch.compile`'s
-default mode is within 4 % of optimal for ResNet-50 yet leaves **2.7×** on
-the table for small-batch ResNet-18 (CUDA-graph mode won both — by 1.04×
-on one, 2.7× on the other); fp16 beats
+default mode is within 4 % of the tuner's ResNet-50 pick — the raw-fastest
+trial there was max-autotune, another 2.7 % quicker, which the 3 % noise
+floor deliberately ignores in favour of the much cheaper compile — yet the
+same default mode leaves **2.7×** on the table for small-batch ResNet-18
+(CUDA-graph mode won both searches); fp16 beats
 bf16 on one workload and loses on the next; on tiny models AMP *loses* to
 fp32 outright. v1 of this package was a fixed-heuristic wrapper and its own
 benchmarks caught it being slower than baseline at one shape. So v2
@@ -133,37 +136,42 @@ The report is always honest and complete:
 ```
 autotune report - NVIDIA A100-SXM4-40GB | torch 2.13.0+cu129 | search took 56s
 baseline = PyTorch-default fp32 eager: 8.95 ms/step
-config                                                 status    ms/step  vs base  compile
-fp32_default compile=off                               ok           8.95    1.00x        -
-tf32 compile=off channels_last fused                   ok           8.78    1.02x        -
-amp_bf16 compile=off channels_last fused               ok           8.91    1.00x        -
-amp_fp16 compile=off channels_last fused               ok           9.35    0.96x        -
-tf32 compile=default channels_last fused               ok           6.51    1.37x      13s
-amp_bf16 compile=default channels_last fused           ok           6.27    1.43x       2s
-tf32 compile=reduce-overhead channels_last fused       ok           2.85    3.14x      11s
-amp_bf16 compile=reduce-overhead channels_last fused   ok           2.33    3.83x       1s  <== winner
-amp_bf16 compile=max-autotune channels_last fused      ok           2.37    3.78x       2s
-amp_bf16 compile=reduce-overhead fused                 ok           2.78    3.23x      13s
-amp_bf16 compile=reduce-overhead channels_last         ok           3.01    2.97x       1s
+config                                               status          ms/step  vs base  compile
+fp32_default compile=off                             ok                 8.95    1.00x        -
+tf32 compile=off channels_last fused                 ok                 8.78    1.02x        -
+amp_bf16 compile=off channels_last fused             ok                 8.91    1.00x        -
+amp_fp16 compile=off channels_last fused             ok                 9.35    0.96x        -
+tf32 compile=default channels_last fused             ok                 6.51    1.37x      13s
+amp_bf16 compile=default channels_last fused         ok                 6.27    1.43x       2s
+tf32 compile=reduce-overhead channels_last fused     ok                 2.85    3.14x      11s
+amp_bf16 compile=reduce-overhead channels_last fused ok                 2.33    3.83x       1s <== winner
+amp_bf16 compile=max-autotune channels_last fused    ok                 2.37    3.78x       2s
+amp_bf16 compile=reduce-overhead fused               ok                 2.78    3.23x      13s
+amp_bf16 compile=reduce-overhead channels_last       ok                 3.01    2.97x       1s
+search cost 56s; saves 6.62 ms/step -> breaks even after ~8,463 training steps.
 note: reduce-overhead uses CUDA graphs - keep input shapes static.
 ```
 
-(That is the committed ResNet-18 search verbatim — note AMP alone does
-*nothing* at this shape, fp16 loses, and CUDA-graph mode is worth 2.7×
-over compile-default. A fixed wrapper cannot know any of that.)
+(That is the committed ResNet-18 search, rendered from the committed JSON
+by the shipped `Report` code — note AMP alone does *nothing* at this shape,
+fp16 loses, and CUDA-graph mode is worth 2.7× over compile-default. A fixed
+wrapper cannot know any of that.)
 
 ### Adversarially verified
 
 The committed numbers were attacked before release
 ([`benchmarks/falsify.py`](https://github.com/JonSnow1807/pytorch-autotune/blob/main/benchmarks/falsify.py), output committed next to
 the data): every winner was re-measured in a **real fresh-batch training
-loop, rebuilt from scratch twice**, and reproduced within 1.5 % of its
-committed trial number; the baselines reproduced within 1.9 %; the fp16
+loop, rebuilt from scratch twice**, and reproduced its committed trial
+number within −0.1 % / +1.3 % / +1.5 % (≤ 1.6 % allowing for the printed
+rounding); the baselines reproduced within 1.9 %; the fp16
 winner ran 60 timed-regime steps with **zero** GradScaler-skipped optimizer
 steps; and the tuned config trained a learnable task to convergence
 identically to the baseline. A parallel methodology audit (14 attack
-findings, each adversarially verified) produced two documentation fixes and
-no measurement defects.
+findings, each adversarially verified — the full list with outcomes is
+committed as
+[`methodology_audit.md`](https://github.com/JonSnow1807/pytorch-autotune/blob/main/benchmarks/results/2026-08-25_a100-40gb_v200/methodology_audit.md))
+produced two documentation fixes and no measurement defects.
 
 ### Caveats you should actually read
 

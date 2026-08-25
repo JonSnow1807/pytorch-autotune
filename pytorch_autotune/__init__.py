@@ -11,7 +11,7 @@ Two entry points:
   a tuning run, but expect it to leave speed on the table.
 """
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 
 from .autotune import AutoTune, quick_optimize
 from .tuner import AutotuneResult, Report, TrialConfig, TrialResult, autotune
