@@ -1,5 +1,6 @@
 """
-PyTorch AutoTune - one-call setup of PyTorch's built-in training optimizations
+PyTorch AutoTune - legacy heuristic wrapper (see tuner.py for the v2.0
+measured path). One-call setup of PyTorch's built-in training optimizations
 ===============================================================================
 Applies AMP (mixed precision), torch.compile, fused optimizers, TF32 and
 channels-last in one call. The speedup is workload-dependent: measured on an
