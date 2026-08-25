@@ -22,8 +22,19 @@
   vs plain `torch.compile` on ResNet-50/ResNet-18/Transformer — the claims
   v1.0 fabricated, now exceeded with the baselines labelled and the data
   committed.
+* **HuggingFace-style dict batches**: `autotune(model, {"input_ids": ...,
+  "labels": ...})` calls `model(**batch)` and uses the output's `.loss`
+  (pre-publish probe: HF models previously crashed outright). `(input,
+  target)` default losses are now target-dtype aware (int -> CrossEntropy,
+  float -> MSE); parameter-less models fail fast with a clear error.
+* Cache keys include a structural digest of the module (a probe showed two
+  different `nn.Sequential`s with equal parameter counts colliding).
+* UX: compile trials announce themselves (max-autotune can look hung),
+  Ctrl-C returns the best config found so far, the report prints a
+  break-even line, and `report.to_dict()/to_json()` export the trials.
 * Tests (baseline guarantee, disqualification paths, state restoration,
-  budget skips, cache) and CPU CI (torch 2.4/2.13).
+  budget skips, cache collision regression, dict/HF batches, interrupt
+  handling) and CPU CI (torch 2.4/2.13).
 
 ### Changed
 

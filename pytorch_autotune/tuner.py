@@ -47,6 +47,53 @@ _COMPILE_COST_EST = {"off": 0.0, "default": 25.0, "reduce-overhead": 45.0,
 _NOISE_FLOOR = 1.03  # a candidate must beat the incumbent by >3% to win
 
 
+@dataclasses.dataclass
+class _Batch:
+    """Normalised example batch: a tensor, an (input, target) pair, or a
+    dict of model kwargs (the HuggingFace convention - if the model's output
+    has a non-None ``.loss``, that is used directly)."""
+    kind: str                      # tensor | pair | dict
+    data: Optional[torch.Tensor] = None
+    target: Optional[torch.Tensor] = None
+    kwargs: Optional[Dict[str, Any]] = None
+
+    @staticmethod
+    def normalize(example_batch, device: str) -> "_Batch":
+        if isinstance(example_batch, dict):
+            kw = {k: (v.to(device) if isinstance(v, torch.Tensor) else v)
+                  for k, v in example_batch.items()}
+            return _Batch("dict", kwargs=kw)
+        if isinstance(example_batch, (tuple, list)):
+            if len(example_batch) != 2:
+                raise ValueError(
+                    "example_batch tuple must be (input, target); for models "
+                    "taking multiple inputs pass a dict of kwargs instead")
+            d, t = example_batch
+            return _Batch("pair", data=d.to(device), target=t.to(device))
+        return _Batch("tensor", data=example_batch.to(device))
+
+    def default_loss_fn(self):
+        if self.kind == "dict":
+            return None  # use output.loss; checked at baseline time
+        if self.kind == "pair":
+            if self.target.is_floating_point():
+                return nn.MSELoss()
+            return nn.CrossEntropyLoss()
+        return lambda out: out.float().mean()
+
+    def signature(self) -> str:
+        if self.kind == "dict":
+            return "|".join(f"{k}:{tuple(v.shape)}:{v.dtype}" if isinstance(v, torch.Tensor)
+                            else f"{k}:{v!r}" for k, v in sorted(self.kwargs.items()))
+        sig = f"{tuple(self.data.shape)}:{self.data.dtype}"
+        if self.target is not None:
+            sig += f"|{tuple(self.target.shape)}:{self.target.dtype}"
+        return sig
+
+    def channels_last_ok(self) -> bool:
+        return self.kind != "dict" and self.data is not None and self.data.dim() == 4
+
+
 @dataclasses.dataclass(frozen=True)
 class TrialConfig:
     precision: str = "fp32_default"   # fp32_default | tf32 | amp_bf16 | amp_fp16
@@ -94,6 +141,7 @@ class Report:
         self.baseline_ms: Optional[float] = None
         self.winner: Optional[TrialResult] = None
         self.total_s: float = 0.0
+        self.interrupted: bool = False
 
     def add(self, t: TrialResult) -> None:
         self.trials.append(t)
@@ -114,6 +162,22 @@ class Report:
                 f"(PyTorch-default fp32 eager, {self.baseline_ms:.2f} ms/step) "
                 f"on {self.env.get('gpu_name', 'unknown GPU')}")
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "env": self.env,
+            "baseline_ms": self.baseline_ms,
+            "total_s": self.total_s,
+            "interrupted": self.interrupted,
+            "winner": (self.winner.config.to_dict() if self.winner else None),
+            "trials": [{"config": t.config.to_dict(), "status": t.status,
+                        "ms_per_step": t.ms_per_step, "compile_s": t.compile_s,
+                        "speedup": t.speedup, "note": t.note} for t in self.trials],
+        }
+
+    def to_json(self, **kwargs) -> str:
+        import json
+        return json.dumps(self.to_dict(), **kwargs)
+
     def __str__(self) -> str:
         if not self.trials:
             return ("autotune report - no trials ran (config restored from cache; "
@@ -132,6 +196,16 @@ class Report:
             mark = " <== winner" if self.winner is t else ""
             note = f"  ({t.note})" if t.note and t.status != "ok" else ""
             lines.append(f"{t.config.label:52s} {t.status:13s} {ms:>9s} {sp:>8s} {cs:>8s}{mark}{note}")
+        if self.interrupted:
+            lines.append("note: search was interrupted - best config found so far.")
+        w = self.winner
+        if (w and w.status == "ok" and self.baseline_ms
+                and w.ms_per_step < self.baseline_ms):
+            saved_ms = self.baseline_ms - w.ms_per_step
+            breakeven = int(self.total_s * 1000 / saved_ms)
+            lines.append(f"search cost {self.total_s:.0f}s; saves "
+                         f"{saved_ms:.2f} ms/step -> breaks even after "
+                         f"~{breakeven:,} training steps.")
         if self.winner and self.winner.config.compile == "reduce-overhead":
             lines.append("note: reduce-overhead uses CUDA graphs - keep input shapes static.")
         return "\n".join(lines)
@@ -156,12 +230,22 @@ class AutotuneResult:
             return contextlib.nullcontext()
         return torch.amp.autocast(self._device.split(":")[0], dtype=dt)
 
-    def step(self, data: torch.Tensor, target: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """One full training step with the tuned setup; returns the loss."""
+    def step(self, data, target: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """One full training step with the tuned setup; returns the loss.
+
+        ``data`` may be a tensor (with optional ``target``) or a dict of
+        model kwargs (HuggingFace style - the output's ``.loss`` is used).
+        """
         self.optimizer.zero_grad(set_to_none=True)
         with self.autocast():
-            out = self.model(data)
-            loss = self._loss_fn(out, target) if target is not None else self._loss_fn(out)
+            if isinstance(data, dict):
+                out = self.model(**data)
+                loss = getattr(out, "loss", None)
+                if loss is None:
+                    loss = self._loss_fn(out)
+            else:
+                out = self.model(data)
+                loss = self._loss_fn(out, target) if target is not None else self._loss_fn(out)
         if self.scaler is not None:
             self.scaler.scale(loss).backward()
             self.scaler.step(self.optimizer)
@@ -239,13 +323,29 @@ def _make_optimizer(optimizer: Union[str, Callable], params, lr: float, fused: b
     raise ValueError(f"unknown optimizer {optimizer!r}")
 
 
-def _build_step(model: nn.Module, cfg: TrialConfig, data, target, loss_fn,
+def _compute_loss(out, batch: "_Batch", loss_fn):
+    if batch.kind == "dict":
+        hf_loss = getattr(out, "loss", None)
+        if hf_loss is not None:
+            return hf_loss
+        if loss_fn is None:
+            raise ValueError(
+                "dict batch given but the model output has no .loss and no "
+                "loss_fn was provided - pass loss_fn=... to autotune()")
+        return loss_fn(out)
+    if batch.target is not None:
+        return loss_fn(out, batch.target)
+    return loss_fn(out)
+
+
+def _build_step(model: nn.Module, cfg: TrialConfig, batch: "_Batch", loss_fn,
                 optimizer_spec, lr: float, device: str):
-    """Build (step_fn, cleanup_hint) for one candidate. May raise (e.g. a
+    """Build the training-step closure for one candidate. May raise (e.g. a
     compile failure at build time); the caller records that as disqualified."""
     if cfg.channels_last:
         model = model.to(memory_format=torch.channels_last)
-        data = data.to(memory_format=torch.channels_last)
+        batch = dataclasses.replace(
+            batch, data=batch.data.to(memory_format=torch.channels_last))
     run_model = model
     if cfg.compile != "off":
         mode = None if cfg.compile == "default" else cfg.compile
@@ -254,15 +354,17 @@ def _build_step(model: nn.Module, cfg: TrialConfig, data, target, loss_fn,
     scaler = torch.amp.GradScaler(device.split(":")[0]) if cfg.precision == "amp_fp16" else None
     amp_dtype = cfg.amp_dtype
 
+    def forward():
+        out = run_model(**batch.kwargs) if batch.kind == "dict" else run_model(batch.data)
+        return _compute_loss(out, batch, loss_fn)
+
     def step() -> torch.Tensor:
         opt.zero_grad(set_to_none=True)
         if amp_dtype is not None:
             with torch.amp.autocast(device.split(":")[0], dtype=amp_dtype):
-                out = run_model(data)
-                loss = loss_fn(out, target) if target is not None else loss_fn(out)
+                loss = forward()
         else:
-            out = run_model(data)
-            loss = loss_fn(out, target) if target is not None else loss_fn(out)
+            loss = forward()
         if scaler is not None:
             scaler.scale(loss).backward()
             scaler.step(opt)
@@ -313,12 +415,12 @@ def _time_step_fn(step, device: str, min_chunk_s: float = 0.2,
     return statistics.median(chunk_ms), warm_s
 
 
-def _run_trial(model, cfg: TrialConfig, data, target, loss_fn, optimizer_spec,
+def _run_trial(model, cfg: TrialConfig, batch, loss_fn, optimizer_spec,
                lr, device, state_snapshot) -> TrialResult:
     _apply_precision_flags(cfg)
     torch._dynamo.reset()
     try:
-        step = _build_step(model, cfg, data, target, loss_fn, optimizer_spec, lr, device)
+        step = _build_step(model, cfg, batch, loss_fn, optimizer_spec, lr, device)
         ms, warm_s = _time_step_fn(step, device)
         compile_s = warm_s if cfg.compile != "off" else 0.0
         result = TrialResult(cfg, "ok", ms_per_step=ms, compile_s=compile_s)
@@ -371,17 +473,14 @@ def autotune(
     on copies of the model's state (weights are restored afterwards).
     """
     budget_s = _BUDGETS_S[budget] if isinstance(budget, str) else float(budget)
-    if isinstance(example_batch, (tuple, list)):
-        data, target = example_batch
-    else:
-        data, target = example_batch, None
-    if loss_fn is None:
-        loss_fn = nn.CrossEntropyLoss() if target is not None else (lambda out: out.float().mean())
-
     model = model.to(device)
-    data = data.to(device)
-    if target is not None:
-        target = target.to(device)
+    batch = _Batch.normalize(example_batch, device)
+    if loss_fn is None:
+        loss_fn = batch.default_loss_fn()
+    if not any(p.requires_grad for p in model.parameters()):
+        raise ValueError(
+            "autotune: the model has no trainable parameters - unfreeze some "
+            "or tune a different module")
 
     env = _env_metadata(device)
     report = Report(env)
@@ -392,7 +491,7 @@ def autotune(
 
     # Cache short-circuit
     from . import cache as _cache
-    cache_key = _cache.make_key(model, data, target, device) if cache else None
+    cache_key = _cache.make_key(model, batch.signature(), device) if cache else None
     if cache is True and cache_key:
         hit = _cache.load(cache_key)
         if hit is not None:
@@ -401,13 +500,13 @@ def autotune(
                 print(f"autotune: cache hit -> {cfg.label} "
                       f"(measured {hit.get('speedup', 0):.2f}x on {hit.get('gpu', '?')}); "
                       f"pass cache='refresh' to re-measure")
-            return _finalize(model, cfg, report, data, target, loss_fn, optimizer, lr,
+            return _finalize(model, cfg, report, batch, loss_fn, optimizer, lr,
                              device, from_cache=True)
 
     # Weight snapshot (CPU) - trials train the model; we put it back.
     snapshot = {k: v.detach().to("cpu", copy=True) for k, v in model.state_dict().items()}
 
-    cnn = _is_cnn(model) and isinstance(data, torch.Tensor) and data.dim() == 4
+    cnn = _is_cnn(model) and batch.channels_last_ok()
     fused_ok = _supports_fused_opt()
 
     def trial(cfg: TrialConfig, est_s: float) -> Optional[TrialResult]:
@@ -415,7 +514,10 @@ def autotune(
             r = TrialResult(cfg, "skipped", note=f"budget ({remaining():.0f}s left, ~{est_s:.0f}s needed)")
             report.add(r)
             return None
-        r = _run_trial(model, cfg, data, target, loss_fn, optimizer, lr, device, snapshot)
+        if verbose and cfg.compile != "off":
+            hint = " (max-autotune can take minutes)" if cfg.compile == "max-autotune" else ""
+            print(f"  compiling {cfg.compile}{hint}...")
+        r = _run_trial(model, cfg, batch, loss_fn, optimizer, lr, device, snapshot)
         report.add(r)
         if verbose:
             ms = f"{r.ms_per_step:.2f} ms" if r.ms_per_step else r.note
@@ -441,43 +543,47 @@ def autotune(
         if r is not None and r.status == "ok" and r.ms_per_step * _NOISE_FLOOR < best.ms_per_step:
             best = r
 
-    # Stage 2: precision sweep, no compile.
-    precisions = ["tf32", "amp_bf16", "amp_fp16"] if _supports_bf16() else ["tf32", "amp_fp16"]
-    stage2: Dict[str, TrialResult] = {}
-    for prec in precisions:
-        r = trial(TrialConfig(precision=prec, channels_last=cnn, fused_opt=fused_ok), est_s=8)
-        if r is not None and r.status == "ok":
-            stage2[prec] = r
-            consider(r)
+    # Stages 2-5 are interruptible: Ctrl-C returns the best config found so
+    # far (weights are restored by each trial's finally-block regardless).
+    try:
+        # Stage 2: precision sweep, no compile.
+        precisions = (["tf32", "amp_bf16", "amp_fp16"] if _supports_bf16()
+                      else ["tf32", "amp_fp16"])
+        stage2: Dict[str, TrialResult] = {}
+        for prec in precisions:
+            r = trial(TrialConfig(precision=prec, channels_last=cnn, fused_opt=fused_ok),
+                      est_s=8)
+            if r is not None and r.status == "ok":
+                stage2[prec] = r
+                consider(r)
 
-    # Stage 3: compile sweep on the best two eager precisions.
-    modes = list(compile_modes) if compile_modes is not None else ["default", "reduce-overhead"]
-    if not allow_cudagraphs and "reduce-overhead" in modes:
-        modes.remove("reduce-overhead")
-    ranked = sorted(stage2, key=lambda p: stage2[p].ms_per_step)[:2] or ["amp_fp16"]
-    stage3_best_mode = None
-    for mode in modes:
-        for prec in ranked:
-            r = trial(TrialConfig(precision=prec, compile=mode, channels_last=cnn,
-                                  fused_opt=fused_ok),
-                      est_s=_COMPILE_COST_EST.get(mode, 30) + 8)
-            if r is not None and r.status == "ok" and (best is r or r.ms_per_step <= best.ms_per_step):
-                stage3_best_mode = mode
-            consider(r)
+        # Stage 3: compile sweep on the best two eager precisions.
+        modes = list(compile_modes) if compile_modes is not None else ["default", "reduce-overhead"]
+        if not allow_cudagraphs and "reduce-overhead" in modes:
+            modes.remove("reduce-overhead")
+        ranked = sorted(stage2, key=lambda p: stage2[p].ms_per_step)[:2] or ["amp_fp16"]
+        for mode in modes:
+            for prec in ranked:
+                consider(trial(TrialConfig(precision=prec, compile=mode, channels_last=cnn,
+                                           fused_opt=fused_ok),
+                               est_s=_COMPILE_COST_EST.get(mode, 30) + 8))
 
-    # Stage 4: max-autotune on the winning precision, budget permitting.
-    if compile_modes is None and best.config.precision.startswith("amp"):
-        r = trial(dataclasses.replace(best.config, compile="max-autotune"),
-                  est_s=_COMPILE_COST_EST["max-autotune"] + 10)
-        consider(r)
+        # Stage 4: max-autotune on the winning precision, budget permitting.
+        if compile_modes is None and best.config.precision.startswith("amp"):
+            consider(trial(dataclasses.replace(best.config, compile="max-autotune"),
+                           est_s=_COMPILE_COST_EST["max-autotune"] + 10))
 
-    # Stage 5: micro-toggles on the winner.
-    if best.config.channels_last:
-        consider(trial(dataclasses.replace(best.config, channels_last=False),
-                       est_s=_COMPILE_COST_EST.get(best.config.compile, 0) + 8))
-    if best.config.fused_opt:
-        consider(trial(dataclasses.replace(best.config, fused_opt=False),
-                       est_s=_COMPILE_COST_EST.get(best.config.compile, 0) + 8))
+        # Stage 5: micro-toggles on the winner.
+        if best.config.channels_last:
+            consider(trial(dataclasses.replace(best.config, channels_last=False),
+                           est_s=_COMPILE_COST_EST.get(best.config.compile, 0) + 8))
+        if best.config.fused_opt:
+            consider(trial(dataclasses.replace(best.config, fused_opt=False),
+                           est_s=_COMPILE_COST_EST.get(best.config.compile, 0) + 8))
+    except KeyboardInterrupt:
+        report.interrupted = True
+        if verbose:
+            print("autotune: interrupted - returning best config found so far")
 
     report.finalize(best, time.time() - t_start)
     if verbose:
@@ -491,11 +597,11 @@ def autotune(
 
     # Rebuild the winner cleanly from the snapshot and hand it back.
     model.load_state_dict(snapshot)
-    return _finalize(model, best.config, report, data, target, loss_fn, optimizer,
+    return _finalize(model, best.config, report, batch, loss_fn, optimizer,
                      lr, device)
 
 
-def _finalize(model, cfg: TrialConfig, report: Report, data, target, loss_fn,
+def _finalize(model, cfg: TrialConfig, report: Report, batch: "_Batch", loss_fn,
               optimizer_spec, lr, device, from_cache: bool = False) -> AutotuneResult:
     _apply_precision_flags(cfg)
     torch._dynamo.reset()

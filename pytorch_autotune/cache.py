@@ -21,14 +21,17 @@ _CACHE_PATH = Path(os.environ.get(
 ))
 
 
-def make_key(model, data, target, device: str) -> str:
+def make_key(model, batch_signature: str, device: str) -> str:
     from . import __version__
+    # Structural digest: two different architectures must never share a key,
+    # even with equal class names and parameter counts (a plain param-count
+    # key demonstrably collided for two different nn.Sequentials).
+    structure = ";".join(f"{name}:{tuple(p.shape)}"
+                         for name, p in model.named_parameters())
     parts = [
         type(model).__name__,
-        str(sum(p.numel() for p in model.parameters())),
-        str(tuple(data.shape)) if isinstance(data, torch.Tensor) else "?",
-        str(data.dtype) if isinstance(data, torch.Tensor) else "?",
-        str(tuple(target.shape)) if isinstance(target, torch.Tensor) else "none",
+        hashlib.sha256(structure.encode()).hexdigest()[:16],
+        batch_signature,
         torch.cuda.get_device_name() if device.startswith("cuda") and torch.cuda.is_available() else device,
         torch.__version__,
         __version__,

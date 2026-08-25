@@ -151,3 +151,132 @@ def test_allow_cudagraphs_false_excludes_reduce_overhead():
     res = autotune(m, batch(), budget=90, cache=False, verbose=False,
                    allow_cudagraphs=False, compile_modes=None)
     assert all(t.config.compile != "reduce-overhead" for t in res.report.trials)
+
+
+# --------------------------------------------------------------------------- #
+# v2.0 pre-publish hardening: dict batches, cache collisions, guards, UX.
+# --------------------------------------------------------------------------- #
+
+
+def test_cache_key_distinguishes_architectures():
+    # Two DIFFERENT architectures with the same class name, parameter count
+    # and input shape must not share a cache key (this collided before the
+    # structural digest was added).
+    import torch.nn as nn
+    m1 = nn.Sequential(nn.Linear(100, 50), nn.ReLU(), nn.Linear(50, 10))
+    n1 = sum(p.numel() for p in m1.parameters())
+    m2 = None
+    for h in range(1, 80):
+        cand = nn.Sequential(nn.Linear(100, h), nn.Linear(h, 10))
+        if sum(p.numel() for p in cand.parameters()) == n1:
+            m2 = cand
+            break
+    assert m2 is not None, "could not construct a colliding architecture"
+    sig = "(4, 100):torch.float32"
+    assert at_cache.make_key(m1, sig, "cpu") != at_cache.make_key(m2, sig, "cpu")
+
+
+def test_parameterless_model_raises_clearly():
+    class NoParams(nn.Module):
+        def forward(self, x):
+            return x.sum(-1)
+
+    with pytest.raises(ValueError, match="no trainable parameters"):
+        from pytorch_autotune import autotune as _at
+        _at(NoParams(), torch.randn(4, 8), budget=10, cache=False, verbose=False,
+            device="cuda" if torch.cuda.is_available() else "cpu")
+
+
+def test_report_json_and_payback_line():
+    r = Report(env={"gpu_name": "T", "torch": torch.__version__})
+    r.baseline_ms = 10.0
+    base = TrialResult(TrialConfig(), "ok", ms_per_step=10.0)
+    win = TrialResult(TrialConfig(precision="amp_bf16"), "ok", ms_per_step=5.0)
+    r.add(base)
+    r.add(win)
+    r.finalize(win, total_s=60.0)
+    text = str(r)
+    assert "breaks even after" in text and "12,000" in text  # 60s / 5ms = 12000 steps
+    d = r.to_dict()
+    assert d["winner"]["precision"] == "amp_bf16" and len(d["trials"]) == 2
+    import json as _json
+    assert _json.loads(r.to_json())["baseline_ms"] == 10.0
+
+
+@requires_cuda
+def test_float_targets_use_mse_default():
+    torch.manual_seed(0)
+    m = nn.Sequential(nn.Linear(16, 8), nn.ReLU(), nn.Linear(8, 1))
+    x = torch.randn(64, 16)
+    y = torch.randn(64, 1)
+    res = autotune(m, (x, y), budget=30, cache=False, verbose=False, compile_modes=[])
+    assert res.report.winner.status == "ok"
+    loss = res.step(x.cuda(), y.cuda())
+    assert torch.isfinite(loss).all()
+
+
+@requires_cuda
+def test_dict_batch_custom_module():
+    # A plain module taking kwargs, output without .loss -> loss_fn required.
+    class KwModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.lin = nn.Linear(32, 4)
+
+        def forward(self, tokens=None, mask=None):
+            return self.lin(tokens * mask.unsqueeze(-1))
+
+    batch = {"tokens": torch.randn(16, 32), "mask": torch.ones(16)}
+    with pytest.raises(RuntimeError, match="no .loss"):
+        autotune(KwModel(), batch, budget=20, cache=False, verbose=False,
+                 compile_modes=[])
+    res = autotune(KwModel(), batch, budget=30, cache=False, verbose=False,
+                   compile_modes=[], loss_fn=lambda out: out.square().mean())
+    assert res.report.winner.status == "ok"
+    loss = res.step({k: v.cuda() for k, v in batch.items()})
+    assert torch.isfinite(loss).all()
+
+
+@requires_cuda
+def test_hf_style_model_end_to_end():
+    transformers = pytest.importorskip("transformers")
+    cfg = transformers.BertConfig(hidden_size=64, num_hidden_layers=2,
+                                  num_attention_heads=2, intermediate_size=128,
+                                  vocab_size=500, num_labels=3,
+                                  max_position_embeddings=64)
+    model = transformers.BertForSequenceClassification(cfg)
+    batch = {
+        "input_ids": torch.randint(0, 500, (8, 32)),
+        "attention_mask": torch.ones(8, 32, dtype=torch.long),
+        "labels": torch.randint(0, 3, (8,)),
+    }
+    res = autotune(model, batch, budget=45, cache=False, verbose=False,
+                   compile_modes=[])  # eager-only keeps the test fast
+    assert res.report.winner.status == "ok"
+    okays = [t for t in res.report.trials if t.status == "ok"]
+    assert len(okays) >= 2
+    loss = res.step({k: v.cuda() for k, v in batch.items()})
+    assert torch.isfinite(loss).all()
+
+
+@requires_cuda
+def test_keyboard_interrupt_returns_best_so_far(monkeypatch):
+    from pytorch_autotune import tuner as tmod
+
+    calls = {"n": 0}
+    orig = tmod._run_trial
+
+    def interrupting(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 3:  # baseline + one precision trial, then Ctrl-C
+            raise KeyboardInterrupt
+        return orig(*args, **kwargs)
+
+    monkeypatch.setattr(tmod, "_run_trial", interrupting)
+    m = tiny_mlp()
+    res = autotune(m, batch(), budget=60, cache=False, verbose=False)
+    assert res.report.interrupted is True
+    assert res.report.winner is not None and res.report.winner.status == "ok"
+    assert "interrupted" in str(res.report)
+    loss = res.step(*[t.cuda() for t in batch()])
+    assert torch.isfinite(loss).all()

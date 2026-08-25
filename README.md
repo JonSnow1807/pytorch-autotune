@@ -108,6 +108,26 @@ for x, y in loader:
     loss = result.step(x, y)    # or write your own loop with result.autocast()
 ```
 
+`example_batch` may be a tensor, an `(input, target)` pair (integer targets
+default to CrossEntropy, floating targets to MSE), or a **dict of model
+kwargs**. The dict form makes HuggingFace models work with zero config —
+when the output has a `.loss` (i.e. `labels` is in the batch), it is used
+directly:
+
+```python
+from transformers import AutoModelForSequenceClassification
+model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased")
+batch = {"input_ids": ids, "attention_mask": mask, "labels": labels}
+
+result = autotune(model, batch, budget="balanced")
+loss = result.step(batch)       # trains with the tuned setup
+```
+
+Interrupting a search with Ctrl-C keeps the best config found so far (the
+report says so); winning configs export via `result.report.to_json()`, and
+the printed report includes a break-even line (search cost vs per-step
+saving).
+
 The report is always honest and complete:
 
 ```

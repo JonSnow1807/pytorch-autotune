@@ -37,7 +37,7 @@ except ImportError:
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pytorch_autotune.tuner import (  # noqa: E402
-    TrialConfig, _apply_precision_flags, _build_step, _time_step_fn, autotune,
+    TrialConfig, _apply_precision_flags, _Batch, _build_step, _time_step_fn, autotune,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -90,8 +90,8 @@ def measure_fixed(model, batch, cfg: TrialConfig, strict_fp32=False):
         torch.backends.cudnn.allow_tf32 = False
         torch.backends.cudnn.benchmark = False
     torch._dynamo.reset()
-    step = _build_step(model, cfg, data, target, nn.CrossEntropyLoss(), "adamw",
-                       1e-3, "cuda")
+    step = _build_step(model, cfg, _Batch("pair", data=data, target=target),
+                       nn.CrossEntropyLoss(), "adamw", 1e-3, "cuda")
     ms, warm_s = _time_step_fn(step, "cuda")
     torch._dynamo.reset()
     torch.cuda.empty_cache()
