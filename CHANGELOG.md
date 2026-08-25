@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.0.0] - 2026-08-25 — the real autotuner
+
+### Added
+
+* `autotune(model, example_batch, budget=...)` — measurement-driven search
+  over precision (fp32/TF32/fp16/bf16) x `torch.compile` mode
+  (off/default/reduce-overhead/max-autotune) x channels-last x fused
+  optimizer, running real training steps on the caller's batch under a
+  wall-clock budget. Weights are snapshotted and restored: tuning never
+  trains the model. Non-finite-loss, OOM and compile-failure candidates are
+  disqualified and shown in the report next to the losers and compile
+  costs. **Baseline guarantee**: the measured PyTorch-default fp32 baseline
+  is a candidate, and nothing that failed to beat it (>3 % noise floor) is
+  ever returned.
+* Config cache per (model, shapes, GPU, torch version); `cache="refresh"`.
+* `benchmarks/suite.py` + committed results
+  (`benchmarks/results/2026-08-25_a100-40gb_v200/`, clean clone `b4b0364`,
+  locked clocks): tuned configs reach 5.84x/8.37x/6.65x vs strict-fp32
+  eager, 2.71x/3.84x/6.65x vs PyTorch-default fp32, and 2.03x/3.17x/6.08x
+  vs plain `torch.compile` on ResNet-50/ResNet-18/Transformer — the claims
+  v1.0 fabricated, now exceeded with the baselines labelled and the data
+  committed.
+* Tests (baseline guarantee, disqualification paths, state restoration,
+  budget skips, cache) and CPU CI (torch 2.4/2.13).
+
+### Changed
+
+* torch floor raised to 2.4 (the oldest version CI exercises).
+* `quick_optimize`/`AutoTune` remain as the documented unmeasured
+  heuristic path.
+
 ## [1.0.3] - 2026-08-25 — honesty release
 
 ### Retracted

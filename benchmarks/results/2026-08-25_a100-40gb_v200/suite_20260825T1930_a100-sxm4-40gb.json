@@ -1,0 +1,551 @@
+{
+ "metadata": {
+  "timestamp": "2026-08-25T19:30:45+00:00",
+  "gpu_name": "NVIDIA A100-SXM4-40GB",
+  "torch": "2.13.0+cu129",
+  "python": "3.12.13",
+  "budget": "max",
+  "gpu_clock_state": "1410 MHz, 1410 MHz, Enabled",
+  "git_commit": "b4b0364ad7e5cb0f86dad4c2be66b786a7e89dde",
+  "git_dirty": false
+ },
+ "results": {
+  "resnet50_224px_b64": {
+   "strict_fp32_eager": {
+    "ms_per_step": 158.64,
+    "warmup_s": 2.1,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": true
+   },
+   "pytorch_default_fp32_eager": {
+    "ms_per_step": 73.56,
+    "warmup_s": 0.8,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "plain_compile_default_fp32": {
+    "ms_per_step": 55.17,
+    "warmup_s": 42.8,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "default",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "autotuned": {
+    "ms_per_step": 27.185559272766113,
+    "config": {
+     "precision": "amp_fp16",
+     "compile": "reduce-overhead",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "compile_s": 2.4972057342529297,
+    "search_s": 82.9
+   },
+   "trials": [
+    {
+     "config": {
+      "precision": "fp32_default",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 73.55483373006184,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 61.00946664810181,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 36.74046198527018,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 30.525684356689453,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "default",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 28.247799192156112,
+     "compile_s": 2.904604911804199,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "default",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 28.826917920793807,
+     "compile_s": 2.435681104660034,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 27.185559272766113,
+     "compile_s": 2.4972057342529297,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 27.73389220237732,
+     "compile_s": 2.8941001892089844,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "max-autotune",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 26.48290991783142,
+     "compile_s": 9.525339126586914,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "reduce-overhead",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 27.391910552978516,
+     "compile_s": 38.99176836013794,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 29.359102249145508,
+     "compile_s": 2.479158639907837,
+     "note": ""
+    }
+   ],
+   "speedup_vs_strict_fp32": 5.84,
+   "speedup_vs_pytorch_default": 2.71,
+   "speedup_vs_plain_compile": 2.03
+  },
+  "resnet18_32px_b128": {
+   "strict_fp32_eager": {
+    "ms_per_step": 19.55,
+    "warmup_s": 0.2,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": true
+   },
+   "pytorch_default_fp32_eager": {
+    "ms_per_step": 8.96,
+    "warmup_s": 0.1,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "plain_compile_default_fp32": {
+    "ms_per_step": 7.41,
+    "warmup_s": 16.7,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "default",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "autotuned": {
+    "ms_per_step": 2.3343531708968315,
+    "config": {
+     "precision": "amp_bf16",
+     "compile": "reduce-overhead",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "compile_s": 0.9163460731506348,
+    "search_s": 56.0
+   },
+   "trials": [
+    {
+     "config": {
+      "precision": "fp32_default",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 8.950617002404256,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 8.779972791671753,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 8.908137031223463,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 9.348233540852865,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "default",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 6.5126265248944675,
+     "compile_s": 13.020710229873657,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "default",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 6.2675399164999686,
+     "compile_s": 1.6445701122283936,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 2.8460110936846053,
+     "compile_s": 11.34500527381897,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 2.3343531708968315,
+     "compile_s": 0.9163460731506348,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "max-autotune",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 2.366003782852836,
+     "compile_s": 2.4248039722442627,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "reduce-overhead",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 2.775236964225769,
+     "compile_s": 12.864684343338013,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 3.0136303823502337,
+     "compile_s": 0.9293560981750488,
+     "note": ""
+    }
+   ],
+   "speedup_vs_strict_fp32": 8.37,
+   "speedup_vs_pytorch_default": 3.84,
+   "speedup_vs_plain_compile": 3.17
+  },
+  "transformer_6l_s128_b32": {
+   "strict_fp32_eager": {
+    "ms_per_step": 35.7,
+    "warmup_s": 0.4,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": true
+   },
+   "pytorch_default_fp32_eager": {
+    "ms_per_step": 35.72,
+    "warmup_s": 0.4,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "plain_compile_default_fp32": {
+    "ms_per_step": 32.64,
+    "warmup_s": 14.6,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "default",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "autotuned": {
+    "ms_per_step": 5.367762701851981,
+    "config": {
+     "precision": "amp_bf16",
+     "compile": "max-autotune",
+     "channels_last": false,
+     "fused_opt": true
+    },
+    "compile_s": 1.0300264358520508,
+    "search_s": 12.2
+   },
+   "trials": [
+    {
+     "config": {
+      "precision": "fp32_default",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 35.73493162790934,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 12.799680233001709,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 11.8253651787253,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 12.762725353240967,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "default",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 6.135813395182292,
+     "compile_s": 0.8267250061035156,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "default",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 7.794094085693359,
+     "compile_s": 0.8429772853851318,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "reduce-overhead",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 5.624210133272059,
+     "compile_s": 0.80861496925354,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "reduce-overhead",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 5.812912276296904,
+     "compile_s": 0.8147540092468262,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "max-autotune",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 5.367762701851981,
+     "compile_s": 1.0300264358520508,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "max-autotune",
+      "channels_last": false,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 6.237490971883139,
+     "compile_s": 1.0128848552703857,
+     "note": ""
+    }
+   ],
+   "speedup_vs_strict_fp32": 6.65,
+   "speedup_vs_pytorch_default": 6.65,
+   "speedup_vs_plain_compile": 6.08
+  }
+ }
+}

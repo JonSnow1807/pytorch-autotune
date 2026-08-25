@@ -5,10 +5,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pytorch-autotune",
-    version="1.0.3",
+    version="2.0.0",
     author="Chinmay Shrivastava",
     author_email="cshrivastava2000@gmail.com",
-    description="One-call setup of PyTorch's built-in training optimizations (AMP, torch.compile, fused optimizers, TF32, channels-last)",
+    description="Measurement-driven PyTorch training autotuner: tries precision/compile/memory-format configs on your model, keeps the fastest, never returns one slower than your baseline",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/JonSnow1807/pytorch-autotune",

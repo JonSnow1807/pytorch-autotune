@@ -1,124 +1,164 @@
 # PyTorch AutoTune
 
-**One call to apply PyTorch's built-in training optimizations — AMP, `torch.compile`, fused optimizers, TF32 and channels-last — with honest, measured expectations.**
+**A real autotuner: it measures candidate training configurations on *your*
+model and batch — precision × `torch.compile` mode × memory format × fused
+optimizer — keeps the fastest, and is structurally incapable of returning a
+config slower than your baseline.**
 
+[![CI](https://github.com/JonSnow1807/pytorch-autotune/actions/workflows/ci.yml/badge.svg)](https://github.com/JonSnow1807/pytorch-autotune/actions/workflows/ci.yml)
 [![PyPI version](https://badge.fury.io/py/pytorch-autotune.svg)](https://pypi.org/project/pytorch-autotune/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Honesty note (v1.0.3).** Earlier versions of this README claimed a
-> universal "4x speedup", benchmark tables (including an ImageNet row and an
-> energy study) with no committed evidence, and a "beats torch.compile"
-> comparison that its own mechanism contradicts — this package *wraps*
-> `torch.compile`. Those claims are retracted. What this package actually
-> does: it saves you ~20 lines of boilerplate by applying PyTorch's own
-> optimization features correctly in one call. The speedup those features
-> give is real but **workload-dependent**, and every number below was
-> measured with the committed script and can be reproduced.
-
-## What it does
-
 ```python
-from pytorch_autotune import quick_optimize
+from pytorch_autotune import autotune
 
-model, optimizer, scaler = quick_optimize(model)   # AMP + compile + fused + TF32
+result = autotune(model, (inputs, targets), budget="balanced")  # measures, picks
+print(result.report)          # every trial: winners, losers, disqualifications
+loss = result.step(x, y)      # train with the tuned setup
 ```
 
-One call applies, with sensible per-GPU defaults and manual overrides:
+## Why measure instead of guess
 
-1. **Mixed precision** (`torch.amp` autocast + `GradScaler`)
-2. **`torch.compile`** (default / `reduce-overhead` / `max-autotune`)
-3. **Fused optimizers** (`AdamW`/`Adam` with `fused=True`)
-4. **TF32** on Ampere+, **channels-last** for CNNs, `cudnn.benchmark`
+No fixed configuration is right for every workload — that is a measured
+fact, not a slogan. From this repo's committed benchmark run
+([data](benchmarks/results/2026-08-25_a100-40gb_v200/)): `torch.compile`'s
+default mode is the right call for ResNet-50 but leaves **2.7×** on the
+table for small-batch ResNet-18 (where CUDA-graph mode wins); fp16 beats
+bf16 on one workload and loses on the next; on tiny models AMP *loses* to
+fp32 outright. v1 of this package was a fixed-heuristic wrapper and its own
+benchmarks caught it being slower than baseline at one shape. So v2
+measures: every candidate runs real training steps on your actual model and
+batch, and the report shows everything it tried.
 
-These are PyTorch's features, not this package's — the package is a
-convenience wrapper. If you're comfortable setting them up yourself, you
-don't need it.
+**The baseline guarantee**: the first thing measured is your baseline
+(PyTorch-default fp32 eager, plain optimizer). A candidate must beat the
+incumbent by >3 % (noise floor) to win, so the returned config never lost
+to what you already had.
 
 ## Measured results
 
-Measured with [`benchmarks/measure.py`](https://github.com/JonSnow1807/pytorch-autotune/blob/main/benchmarks/measure.py) on an
-A100-SXM4-40GB, PyTorch 2.13.0+cu129, 2026-08-25. `ms/step` is a full
-training step (forward + loss + backward + optimizer), median-of-loop after
-warmup, compile time excluded (it is real but one-off).
+From [`benchmarks/suite.py`](benchmarks/suite.py) — committed output in
+[`benchmarks/results/2026-08-25_a100-40gb_v200/`](benchmarks/results/2026-08-25_a100-40gb_v200/)
+(clean clone `b4b0364`, A100-SXM4-40GB, torch 2.13.0+cu129, SM clocks locked
+at 1410 MHz, `budget="max"`). Full training steps (forward + loss + backward
++ optimizer); three baselines, all measured with the same protocol:
 
-| Workload | Baseline fp32 eager | AutoTune | Speedup |
-|---|---|---|---|
-| ResNet-50, 224×224, batch 64 | 73.3 ms | 28.0 ms | **2.62×** |
-| ResNet-18, 32×32 (CIFAR-shape), batch 128 | 8.1 ms | 6.4 ms | 1.26× |
-| — same, but without `torch.compile` | 8.1 ms | 9.0 ms | **0.89× (slower!)** |
-| — plain `torch.compile`, no AMP | 8.1 ms | 7.2 ms | 1.12× |
+| workload | tuner's pick | vs strict fp32 eager¹ | vs PyTorch-default fp32² | vs plain `torch.compile`³ |
+|---|---|---|---|---|
+| ResNet-50, 224px, b64 | fp16 · reduce-overhead · CL · fused | **5.84×** | **2.71×** | **2.03×** |
+| ResNet-18, 32px, b128 | bf16 · reduce-overhead · CL · fused | **8.37×** | **3.84×** | **3.17×** |
+| Transformer 6L, s128, b32 | bf16 · max-autotune · fused | **6.65×** | **6.65×** | **6.08×** |
 
-How to read this honestly:
+¹ TF32 disabled everywhere — the most generous framing, listed for
+comparability with historical claims.
+² What an untuned user gets (cuDNN TF32 on — PyTorch's default). **This is
+the honest headline column.**
+³ `torch.compile(model)` default mode on PyTorch-default fp32 — the "just
+use torch.compile" alternative. The tuner wins because it *also* picks
+precision, CUDA-graph mode, memory format and the fused optimizer — it uses
+`torch.compile`, it doesn't compete with it.
 
-* **Compute-bound models benefit most** (2.62× on the ResNet-50 step —
-  mostly AMP's tensor cores plus compile's fusion). Small or launch-bound
-  workloads benefit little, and some configurations **lose** to the fp32
-  baseline (the 0.89× row) — which is exactly why you should measure your
-  own workload rather than trust any package's headline.
-* Against `torch.compile` alone, the full stack adds AMP's gains on top —
-  it is not an alternative to `torch.compile` and does not "beat" it; it
-  *uses* it.
-* Older GPUs with a larger fp16-vs-fp32 throughput gap (e.g. T4) can see
-  larger AMP ratios on compute-bound CNNs; no number is claimed here for
-  hardware this version was not measured on.
+Search cost: one-off, budget-capped (`"fast"` ≈ 2 min, `"balanced"` ≈ 6 min,
+`"max"` ≈ 15 min — max-autotune compiles alone can take 1–4 min). Winning
+configs are cached per (model, shapes, GPU, torch version); later calls skip
+the search (`cache="refresh"` re-measures).
 
-## Installation
+> **On this project's history.** v1.0 of this package claimed "4× speedup"
+> and "beats torch.compile by 79 %" with no committed evidence; those claims
+> were retracted in v1.0.3 (see CHANGELOG). The v2 rewrite was built to earn
+> them instead: against the strict-fp32 baseline the old claims implicitly
+> used, the measured tuner exceeds 4× on all three workloads (5.8–8.4×), and
+> it exceeds plain `torch.compile` by 103–508 % — with the baselines defined,
+> the mechanism explained, and the data committed. Against the fairer
+> PyTorch-default baseline the honest numbers are 2.7–6.7×.
+
+## Install
 
 ```bash
 pip install pytorch-autotune
 ```
 
+Requires torch ≥ 2.4 and a CUDA GPU for tuning (imports and falls back
+gracefully on CPU).
+
 ## Usage
 
 ```python
-from pytorch_autotune import AutoTune
+from pytorch_autotune import autotune
 
-autotune = AutoTune(model, device='cuda', verbose=True)
-model, optimizer, scaler = autotune.optimize(
-    optimizer_name='AdamW',
-    learning_rate=1e-3,
-    compile_mode='default',   # or 'reduce-overhead' / 'max-autotune'
-    use_amp=True,
-    use_compile=True,
-    use_fused=True,
+result = autotune(
+    model,                      # weights preserved: tuning never trains your model
+    (example_inputs, targets),  # the shapes you actually train at
+    loss_fn=None,               # default: CrossEntropyLoss (or output.mean() without targets)
+    optimizer="adamw",          # "adam" / "sgd" / callable(params) -> Optimizer
+    budget="balanced",          # "fast" | "balanced" | "max" | seconds as int
+    cache=True,                 # True | False | "refresh"
+    allow_cudagraphs=True,      # False to exclude reduce-overhead (dynamic shapes)
 )
 
-for data, target in train_loader:
-    data, target = data.cuda(), target.cuda()
-    optimizer.zero_grad(set_to_none=True)
-    with torch.amp.autocast('cuda'):
-        loss = criterion(model(data), target)
-    scaler.scale(loss).backward()
-    scaler.step(optimizer)
-    scaler.update()
+model, optimizer, scaler = result.model, result.optimizer, result.scaler
+for x, y in loader:
+    x, y = x.cuda(), y.cuda()
+    loss = result.step(x, y)    # or write your own loop with result.autocast()
 ```
 
-Notes:
+The report is always honest and complete:
 
-* The first iterations after `torch.compile` are slow (compilation); plan a
-  warmup.
-* Mixed precision changes numerics; validate your accuracy as you would with
-  any AMP setup.
-* `AutoTune.benchmark()` times forward-only inference under `no_grad` — use
-  `benchmarks/measure.py` for training-step comparisons.
+```
+autotune report - NVIDIA A100-SXM4-40GB | torch 2.13.0+cu129 | search took 56s
+baseline = PyTorch-default fp32 eager: 8.95 ms/step
+config                                                 status    ms/step  vs base  compile
+fp32_default compile=off                               ok           8.95    1.00x        -
+tf32 compile=off channels_last fused                   ok           8.78    1.02x        -
+amp_bf16 compile=off channels_last fused               ok           8.91    1.00x        -
+amp_fp16 compile=off channels_last fused               ok           9.35    0.96x        -
+tf32 compile=default channels_last fused               ok           6.51    1.37x      13s
+amp_bf16 compile=default channels_last fused           ok           6.27    1.43x       2s
+tf32 compile=reduce-overhead channels_last fused       ok           2.85    3.14x      11s
+amp_bf16 compile=reduce-overhead channels_last fused   ok           2.33    3.83x       1s  <== winner
+amp_bf16 compile=max-autotune channels_last fused      ok           2.37    3.78x       2s
+amp_bf16 compile=reduce-overhead fused                 ok           2.78    3.23x      13s
+amp_bf16 compile=reduce-overhead channels_last         ok           3.01    2.97x       1s
+note: reduce-overhead uses CUDA graphs - keep input shapes static.
+```
 
-## Limitations
+(That is the committed ResNet-18 search verbatim — note AMP alone does
+*nothing* at this shape, fp16 loses, and CUDA-graph mode is worth 2.7×
+over compile-default. A fixed wrapper cannot know any of that.)
 
-* This is a wrapper, not a tuner: settings come from a small hardware table,
-  not from measuring your model. (A measurement-driven version is the
-  roadmap.)
-* Measured on one GPU (A100). No claims for other hardware.
-* No tests or CI yet.
+### Caveats you should actually read
+
+* **Winners using `reduce-overhead` need static input shapes** (CUDA
+  graphs). Pass `allow_cudagraphs=False` if your batch shapes vary.
+* Mixed-precision winners change numerics like any AMP setup — validate
+  accuracy as you would if you enabled AMP yourself.
+* The tuner optimizes the training step it can see: your dataloader,
+  logging, and eval are outside its reach.
+* Speedups are workload- and GPU-specific. The table above is an A100;
+  your model on your GPU is what `autotune()` measures.
+
+### Legacy heuristic mode
+
+`quick_optimize(model)` / `AutoTune` (the v1 API) still exist: they apply a
+fixed AMP+compile+fused configuration with no measurement. Fine when you
+cannot afford a tuning run — but the committed data shows fixed heuristics
+leave up to 2.7× unclaimed, which is why `autotune()` exists.
+
+## Tests & CI
+
+`pytest tests -q` — tuner behavior (baseline guarantee, disqualification of
+non-finite/OOM/compile-failure candidates, state restoration, cache, budget
+accounting) on GPU; CI runs the CPU-safe subset on torch 2.4 and 2.13.
 
 ## Citation
 
 ```bibtex
 @software{pytorch_autotune,
-  title = {PyTorch AutoTune: one-call PyTorch training optimization setup},
+  title = {PyTorch AutoTune: measurement-driven PyTorch training configuration tuning},
   author = {Shrivastava, Chinmay},
-  year = {2025},
+  year = {2026},
   url = {https://github.com/JonSnow1807/pytorch-autotune},
-  version = {1.0.3}
+  version = {2.0.0}
 }
 ```
 
