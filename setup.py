@@ -27,7 +27,7 @@ setup(
     ],
     python_requires=">=3.7",
     install_requires=[
-        "torch>=2.0.0",
+        "torch>=2.4.0",
         "numpy>=1.19.0",
     ],
     keywords="pytorch optimization speedup training acceleration autotune",

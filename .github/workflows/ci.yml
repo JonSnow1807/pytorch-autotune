@@ -1,0 +1,34 @@
+# CPU-only CI: import, report/config/cache logic, and auto-skip of GPU tests.
+# CI has no GPU, so it cannot verify measured speedups - the committed
+# benchmark JSONs under benchmarks/results/ carry the hardware truth.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  cpu-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python: "3.10"
+            torch: "2.4.*"
+          - python: "3.12"
+            torch: "2.13.*"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install torch (CPU) and test deps
+        run: |
+          pip install "torch==${{ matrix.torch }}" --index-url https://download.pytorch.org/whl/cpu
+          pip install pytest
+      - name: Install package
+        run: pip install -e .
+      - name: Run tests (GPU tests auto-skip)
+        run: python -m pytest tests -q
