@@ -1,7 +1,10 @@
 """
-PyTorch AutoTune - Automatic 4x Training Speedup
-=================================================
-Achieves 2-4x training speedup through automatic optimization selection.
+PyTorch AutoTune - one-call setup of PyTorch's built-in training optimizations
+===============================================================================
+Applies AMP (mixed precision), torch.compile, fused optimizers, TF32 and
+channels-last in one call. The speedup is workload-dependent: measured on an
+A100, 2.6x for a compute-bound ResNet-50 step and ~1.2x (or nothing) for
+small launch-bound workloads - measure on YOUR model; see the README.
 """
 
 import torch
@@ -13,22 +16,23 @@ import time
 import math
 from typing import Optional, Dict, Any, Tuple
 
-__version__ = "1.0.1"
+__version__ = "1.0.3"
 __author__ = "Chinmay Shrivastava"
 
 class AutoTune:
     """
-    AutoTune: Automatic optimization for 2-4x training speedup.
-    
-    Combines mixed precision, torch.compile, and fused optimizers
-    to achieve dramatic speedup without manual configuration.
-    
+    AutoTune: one-call setup of AMP, torch.compile, fused optimizers,
+    TF32 and channels-last for a PyTorch training loop.
+
+    These are PyTorch's own features; this class only selects and applies
+    them. The result is workload-dependent - large compute-bound models
+    benefit most, small launch-bound ones may see no gain. Measure.
+
     Example:
         >>> from pytorch_autotune import AutoTune
         >>> model = torchvision.models.resnet18()
         >>> autotune = AutoTune(model, device='cuda')
         >>> model, optimizer, scaler = autotune.optimize()
-        >>> # Now train with 4x speedup!
     """
     
     def __init__(
@@ -208,7 +212,7 @@ class AutoTune:
         
         if self.verbose:
             print("\n🚀 AutoTune optimization complete!")
-            print("   Expected speedup: 2-4x")
+            print("   Speedup is workload-dependent - benchmark your own loop.")
             self._print_usage_example()
         
         return self.model, optimizer, scaler
@@ -310,20 +314,20 @@ for epoch in range(num_epochs):
             Dictionary with benchmark results
         """
         if self.verbose:
-            print("\n⏱️ Running benchmark...")
-        
-        # Warmup
-        for _ in range(10):
-            _ = self.model(sample_data.to(self.device))
-        
-        # Benchmark
-        torch.cuda.synchronize() if self.config.get('has_cuda') else None
-        start_time = time.time()
-        
-        for _ in range(iterations):
-            _ = self.model(sample_data.to(self.device))
-        
-        torch.cuda.synchronize() if self.config.get('has_cuda') else None
+            print("\n⏱️ Running benchmark (forward-only, inference)...")
+
+        data = sample_data.to(self.device)  # H2D copy outside the timed loop
+        with torch.no_grad():
+            for _ in range(10):  # warmup
+                _ = self.model(data)
+
+            if self.config.get('has_cuda'):
+                torch.cuda.synchronize()
+            start_time = time.time()
+            for _ in range(iterations):
+                _ = self.model(data)
+            if self.config.get('has_cuda'):
+                torch.cuda.synchronize()
         total_time = time.time() - start_time
         
         throughput = iterations / total_time
@@ -372,7 +376,7 @@ for epoch in range(num_epochs):
                 # Try forward and backward pass
                 dummy_input = torch.randn(batch_size, *input_shape).to(device)
                 output = model(dummy_input)
-                if hasattr(output, 'backward'):
+                if isinstance(output, torch.Tensor) and output.requires_grad:
                     output.sum().backward()
                 optimal_batch = batch_size
                 
@@ -390,18 +394,17 @@ for epoch in range(num_epochs):
 
 def quick_optimize(model: nn.Module, **kwargs) -> Tuple[nn.Module, Any, Optional[GradScaler]]:
     """
-    Quick one-line optimization for any PyTorch model.
-    
+    One-line application of AMP + torch.compile + fused optimizer + TF32.
+
     Args:
         model: PyTorch model to optimize
         **kwargs: Additional arguments for AutoTune
-        
+
     Returns:
         Tuple of (optimized_model, optimizer, scaler)
-        
+
     Example:
         >>> model, optimizer, scaler = quick_optimize(resnet18())
-        >>> # Model is now 4x faster!
     """
     autotune = AutoTune(model, **kwargs)
     return autotune.optimize()

@@ -22,6 +22,6 @@ print("✅ Model created")
 # Optimize with one line!
 model, optimizer, scaler = quick_optimize(model, verbose=False)
 
-print("⚡ Model optimized with AutoTune!")
-print("📈 Ready for 4x faster training!")
+print("⚡ Model optimized with AutoTune (AMP + torch.compile + fused optimizer)")
+print("📈 Speedup depends on your workload - see the README benchmarks")
 print("\nInstall: pip install pytorch-autotune")

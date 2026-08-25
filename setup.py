@@ -5,10 +5,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pytorch-autotune",
-    version="1.0.1",  # Bumped version for update
+    version="1.0.3",
     author="Chinmay Shrivastava",
     author_email="cshrivastava2000@gmail.com",
-    description="Automatic 4x training speedup for PyTorch models",
+    description="One-call setup of PyTorch's built-in training optimizations (AMP, torch.compile, fused optimizers, TF32, channels-last)",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/JonSnow1807/pytorch-autotune",
