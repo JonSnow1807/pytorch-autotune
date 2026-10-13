@@ -8,7 +8,9 @@ import torch.nn as nn
 
 from pytorch_autotune import TrialConfig, autotune
 from pytorch_autotune import cache as at_cache
-from pytorch_autotune.tuner import Report, TrialResult, _env_metadata
+from pytorch_autotune.tuner import (
+    Report, TrialResult, _env_metadata, _make_optimizer, _time_step_fn,
+)
 
 requires_cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
 
@@ -280,3 +282,141 @@ def test_keyboard_interrupt_returns_best_so_far(monkeypatch):
     assert "interrupted" in str(res.report)
     loss = res.step(*[t.cuda() for t in batch()])
     assert torch.isfinite(loss).all()
+
+
+# --------------------------------------------------------------------------- #
+# Labels describe what was measured
+# --------------------------------------------------------------------------- #
+
+
+def test_fused_request_is_never_dropped_silently(monkeypatch):
+    params = [nn.Parameter(torch.zeros(4))]
+    for spec in ("sgd", lambda ps: torch.optim.AdamW(ps)):
+        with pytest.raises(ValueError, match="no fused implementation"):
+            _make_optimizer(spec, params, 1e-3, fused=True)
+
+    class AdamWWithoutFused(torch.optim.AdamW):
+        def __init__(self, params, *args, fused=None, **kwargs):
+            if fused:
+                raise RuntimeError("fused AdamW unavailable")
+            super().__init__(params, *args, **kwargs)
+
+    monkeypatch.setattr(torch.optim, "AdamW", AdamWWithoutFused)
+    with pytest.raises(RuntimeError, match="fused AdamW unavailable"):
+        _make_optimizer("adamw", params, 1e-3, fused=True)
+
+
+def test_cache_key_distinguishes_optimizers():
+    m = tiny_mlp()
+    sig = "(4, 64):torch.float32"
+    keys = {at_cache.make_key(m, sig, "cpu", optimizer=o) for o in ("adamw", "sgd")}
+    assert len(keys) == 2
+
+
+@requires_cuda
+@pytest.mark.parametrize("optimizer, fused_searched", [
+    ("adamw", True),
+    ("sgd", False),
+    (lambda ps: torch.optim.AdamW(ps, lr=1e-3), False),
+], ids=["adamw", "sgd", "factory"])
+def test_fused_label_matches_the_optimizer(optimizer, fused_searched):
+    # Only the built-in Adam/AdamW have a fused option; SGD and caller
+    # factories must never produce a trial or a result labelled "fused".
+    res = autotune(tiny_mlp(), batch(), optimizer=optimizer, budget=30, cache=False,
+                   verbose=False, compile_modes=[])
+    assert any(t.config.fused_opt for t in res.report.trials) == fused_searched
+    assert res.config.fused_opt == bool(res.optimizer.defaults.get("fused"))
+    assert ("fused optimizer not searched" in str(res.report)) != fused_searched
+
+
+@requires_cuda
+def test_fused_not_searched_when_the_fused_optimizer_fails_to_build(monkeypatch):
+    class AdamWWithoutFused(torch.optim.AdamW):
+        def __init__(self, params, *args, fused=None, **kwargs):
+            if fused:
+                raise RuntimeError("fused AdamW unavailable")
+            super().__init__(params, *args, **kwargs)
+
+    monkeypatch.setattr(torch.optim, "AdamW", AdamWWithoutFused)
+    res = autotune(tiny_mlp(), batch(), budget=30, cache=False, verbose=False,
+                   compile_modes=[])
+    assert not any(t.config.fused_opt for t in res.report.trials)
+    assert not res.config.fused_opt
+    assert res.report.winner.status == "ok"
+    assert "fused AdamW unavailable" in str(res.report)
+
+
+# --------------------------------------------------------------------------- #
+# fp16 trials must time real optimizer steps
+# --------------------------------------------------------------------------- #
+
+
+class _InfGradInFp16(torch.autograd.Function):
+    """Identity forward; non-finite gradient whenever the activation is fp16."""
+
+    @staticmethod
+    def forward(ctx, x):
+        ctx.fp16 = x.dtype == torch.float16
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, g):
+        return g * float("inf") if ctx.fp16 else g
+
+
+class FiniteLossInfGradFp16(nn.Module):
+    """Finite loss in every precision, but fp16 gradients overflow every step,
+    so GradScaler skips every fp16 optimizer step."""
+
+    def __init__(self):
+        super().__init__()
+        self.net = tiny_mlp()
+
+    def forward(self, x):
+        h = _InfGradInFp16.apply(self.net[0](x))
+        return self.net[2](self.net[1](h))
+
+
+@requires_cuda
+def test_fp16_candidates_whose_steps_are_skipped_are_disqualified():
+    res = autotune(FiniteLossInfGradFp16(), batch(), budget=60, cache=False, verbose=False,
+                   compile_modes=[])
+    fp16 = [t for t in res.report.trials if t.config.precision == "amp_fp16"]
+    assert fp16 and all(t.status == "disqualified" for t in fp16)
+    assert "skipped" in fp16[0].note
+    assert res.config.precision != "amp_fp16"
+
+
+class _GradTimes(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, factor):
+        ctx.factor = factor
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, g):
+        return g * ctx.factor, None
+
+
+@requires_cuda
+def test_loss_scale_calibration_during_warmup_is_not_disqualified():
+    # GradScaler starts at 2**16 and halves on each overflow; here the first
+    # 15 steps overflow. Warmup must absorb that calibration (more than the
+    # 10-step warmup minimum) instead of timing or rejecting skipped steps.
+    p = nn.Parameter(torch.ones((), device="cuda"))
+    opt = torch.optim.SGD([p], lr=1e-3)
+    scaler = torch.amp.GradScaler("cuda")
+    calls = {"n": 0}
+
+    def step():
+        calls["n"] += 1
+        opt.zero_grad(set_to_none=True)
+        loss = _GradTimes.apply(p, float("inf") if calls["n"] <= 15 else 1.0)
+        scaler.scale(loss).backward()
+        scaler.step(opt)
+        scaler.update()
+        return loss
+
+    step.scaler = scaler
+    _time_step_fn(step, "cuda")  # raises FloatingPointError if it timed skipped steps
+    assert scaler.get_scale() < 2.0 ** 16  # the calibration skips did happen
