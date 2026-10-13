@@ -1,5 +1,44 @@
 # Changelog
 
+## [Unreleased] — credibility fixes
+
+### Fixed
+
+* **A "fused" label now always means a fused optimizer ran.** The fused
+  knob was set on every candidate on a capable GPU, but `"sgd"` and
+  optimizer factories ignore it, and a failed fused construction fell back
+  silently. Those trials, the returned config and its cache entry were
+  still labelled "fused". The knob is now searched only for the built-in
+  Adam/AdamW, and only when the fused optimizer builds. A fused request that
+  cannot be honoured raises, and the report says why the knob was not
+  searched. The committed benchmark results used AdamW, whose fused labels
+  were accurate.
+* **fp16 candidates are timed on real optimizer steps.** Timing checked only
+  for a finite loss, but GradScaler skips optimizer steps whose gradients
+  overflow, and skipped steps are cheaper. Warmup now waits for the loss
+  scale to stop falling. A candidate is disqualified when its scale ends
+  the timed chunks lower than it started, i.e. skips outnumbered scale
+  growths. The pre-release falsification run found zero skips for the
+  committed fp16 winner (F3); the tuner now checks every fp16 candidate.
+* Cached configs are keyed by optimizer as well, so a result measured with
+  one optimizer is not reused for another. A factory is keyed by the class
+  and hyperparameters of the optimizer it builds, because names collide (every
+  `functools.partial`, or two lambdas in one scope).
+
+### Benchmarks
+
+* `benchmarks/suite.py` adds an expert-configuration row (bf16 autocast,
+  `torch.compile` default mode, fused AdamW, TF32, channels_last for
+  convnets) with a speedup column against it. It also reports search cost
+  cold (fresh process, empty Inductor/Triton caches) and warm (the same
+  caches reused). New results are in
+  `benchmarks/results/2026-10-13_h100-80gb_dd2f1a1/` (H100 80GB HBM3).
+  - Against the expert configuration, the tuner's pick measured 1.13x
+    (ResNet-50), 2.52x (ResNet-18) and 2.0x (transformer).
+  - A cold search took 78–517 s and a warm one 16–90 s.
+  - The committed A100 search and compile times match warm caches, not cold
+    ones.
+
 ## [2.0.1] - 2026-08-25 — documentation fidelity
 
 No code changes. A post-publish audit of the published README (115 claims

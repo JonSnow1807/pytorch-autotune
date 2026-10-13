@@ -2,7 +2,7 @@
 
 **A real autotuner: it measures candidate training configurations on *your*
 model and batch — precision × `torch.compile` mode × memory format × fused
-optimizer — keeps the measured winner (a 3 % noise floor breaks ties toward
+Adam/AdamW — keeps the measured winner (a 3 % noise floor breaks ties toward
 the cheaper config), and is structurally incapable of returning a config
 slower than your baseline.**
 
@@ -67,10 +67,53 @@ use torch.compile" alternative. The tuner wins because it *also* picks
 precision, CUDA-graph mode, memory format and the fused optimizer — it uses
 `torch.compile`, it doesn't compete with it.
 
+### Against an expert configuration, with cold and warm search costs
+
+The A100 run above predates two additions to `suite.py`:
+
+- **An expert configuration row.** This is what an informed user would set by
+  hand without measuring: bf16 autocast, `torch.compile` default mode, fused
+  AdamW, TF32 and `cudnn.benchmark`, and channels_last for convnets.
+- **Cold and warm search costs.** Every row and search runs in a fresh process
+  with its own empty Inductor/Triton caches. The search then runs a second
+  time, reusing the caches the first run filled.
+
+Committed output is in
+[`benchmarks/results/2026-10-13_h100-80gb_dd2f1a1/`](https://github.com/JonSnow1807/pytorch-autotune/tree/main/benchmarks/results/2026-10-13_h100-80gb_dd2f1a1/)
+(commit `dd2f1a1`, H100 80GB HBM3, torch 2.13.0+cu129, SM clocks locked at
+1755 MHz, `budget="max"`):
+
+| workload | tuner's pick (cold search) | vs PyTorch-default fp32 | vs expert config | search cost, cold / warm |
+|---|---|---|---|---|
+| ResNet-50, 224px, b64 | fp16 · max-autotune · CL · fused | **2.92×** | **1.13×** | 517 s / 54 s |
+| ResNet-18, 32px, b128 | tf32 · reduce-overhead · CL · fused | **3.24×** | **2.52×** | 78 s / 16 s |
+| Transformer 6L, s128, b32 | fp16 · reduce-overhead · fused | **6.13×** | **2.0×** | 112 s / 90 s |
+
+- **Against the expert configuration the tuner's measured gain is
+  1.13–2.52×.** Most of it comes from choosing CUDA-graph mode (ResNet-18,
+  transformer) or fp16 with max-autotune (ResNet-50). A fixed hand-set config
+  cannot make that choice per workload.
+- **Each reference row is one measurement.** Repeat measurements of the
+  transformer's expert configuration ranged from 5.21 to 6.00 ms, which puts
+  its ratio at 1.97–2.26×. The results directory's `notes.md` has the details.
+- **A first run pays the cold cost.** Compilation was 70–92% of each cold
+  search, and ResNet-50's two max-autotune trials took 190 s and 154 s cold.
+- **The transformer's warm search was not much cheaper than its cold one.**
+  It ranked bf16 ahead of fp16 in eager mode, so it compiled bf16 graphs that
+  the cold run never built. It also picked a different winner (bf16, 2.50 ms
+  against fp16, 2.65 ms).
+- **The A100 timings above match warm caches.** Its searches took 12–83 s and
+  its max-autotune trials 1–10 s, figures that match warm caches but not cold
+  ones. The report excerpt below has the same timings.
+
+These are H100 numbers. Do not compare them with the A100 table.
+
 Search cost: one-off, budget-capped (`"fast"` ≈ 2 min, `"balanced"` ≈ 6 min,
-`"max"` ≈ 15 min — max-autotune compiles alone can take 1–4 min). Winning
-configs are cached per (model, shapes, GPU, torch version); later calls skip
-the search (`cache="refresh"` re-measures).
+`"max"` ≈ 15 min). Most of it is compilation, so it depends on Inductor's
+on-disk cache. At `budget="max"` on the H100, a first run took 78–517 s and a
+repeat run 16–90 s, and a cold max-autotune compile took 61–190 s. Winning
+configs are cached per (model, shapes, optimizer, GPU, torch version); later
+calls skip the search (`cache="refresh"` re-measures).
 
 > **On this project's history.** v1.0 of this package claimed "4× speedup"
 > and "beats torch.compile by 79 %" with no committed evidence; those claims
@@ -155,7 +198,9 @@ note: reduce-overhead uses CUDA graphs - keep input shapes static.
 (That is the committed ResNet-18 search, rendered from the committed JSON
 by the shipped `Report` code — note AMP alone does *nothing* at this shape,
 fp16 loses, and CUDA-graph mode is worth 2.7× over compile-default. A fixed
-wrapper cannot know any of that.)
+wrapper cannot know any of that. Its search time and compile column match
+warm caches: on the H100, the same workload's search broke even after ~19,900
+steps cold and ~3,700 warm.)
 
 ### Adversarially verified
 
@@ -173,6 +218,20 @@ committed as
 [`methodology_audit.md`](https://github.com/JonSnow1807/pytorch-autotune/blob/main/benchmarks/results/2026-08-25_a100-40gb_v200/methodology_audit.md))
 produced two documentation fixes and no measurement defects.
 
+A follow-up (2026-10-13, appended to that file) made four changes to that
+list:
+- reopened the finding on skipped fp16 steps;
+- reopened the finding on warm compile caches;
+- corrected the evidence cited for a third finding;
+- added a new finding: "fused" labels on trials whose optimizer was not fused.
+
+The fixes are in the tuner and the benchmark suite. The tuner now
+disqualifies an fp16 candidate whose loss scale ends its timed chunks lower
+than it started, i.e. whose skipped optimizer steps outnumber GradScaler's
+scale growths. A timing window shorter than the 2000-step growth interval has
+no growths, so there this means any skipped step. The zero-skip result above
+no longer rests on one workload.
+
 ### Caveats you should actually read
 
 * **Winners using `reduce-overhead` need static input shapes** (CUDA
@@ -181,8 +240,17 @@ produced two documentation fixes and no measurement defects.
   accuracy as you would if you enabled AMP yourself.
 * The tuner optimizes the training step it can see: your dataloader,
   logging, and eval are outside its reach.
-* Speedups are workload- and GPU-specific. The table above is an A100;
-  your model on your GPU is what `autotune()` measures.
+* Speedups are workload- and GPU-specific. The tables above are an A100 and
+  an H100; your model on your GPU is what `autotune()` measures.
+* A first search on a machine compiles everything from scratch. See the cold
+  and warm costs above.
+* The search ranks precisions by eager timing to choose which ones to
+  compile. When two precisions measure within noise, that choice can differ
+  between runs. The H100 transformer's cold and warm searches picked fp16 at
+  2.65 ms and bf16 at 2.50 ms.
+* The fused-optimizer knob exists only for the built-in `"adam"`/`"adamw"`.
+  With `"sgd"` or an optimizer factory, the report says the knob was not
+  searched.
 
 ### Legacy heuristic mode
 
@@ -193,9 +261,15 @@ leave up to 2.7× unclaimed, which is why `autotune()` exists.
 
 ## Tests & CI
 
-`pytest tests -q` — tuner behavior (baseline guarantee, disqualification of
-non-finite/OOM/compile-failure candidates, state restoration, cache, budget
-accounting) on GPU; CI runs the CPU-safe subset on torch 2.4 and 2.13.
+`pytest tests -q` — tuner behavior on GPU:
+- the baseline guarantee;
+- disqualification of non-finite, OOM and compile-failure candidates, and of
+  fp16 candidates whose skipped timed steps outnumber GradScaler's scale
+  growths;
+- "fused" labels only on trials that ran a fused optimizer;
+- state restoration, the cache and budget accounting.
+
+CI runs the CPU-safe subset on torch 2.4 and 2.13.
 
 ## Citation
 

@@ -208,6 +208,8 @@ class Report:
                          f"~{breakeven:,} training steps.")
         if self.winner and self.winner.config.compile == "reduce-overhead":
             lines.append("note: reduce-overhead uses CUDA graphs - keep input shapes static.")
+        if self.env.get("fused_opt_not_searched"):
+            lines.append(f"note: fused optimizer not searched - {self.env['fused_opt_not_searched']}.")
         return "\n".join(lines)
 
 
@@ -306,21 +308,52 @@ def _supports_fused_opt() -> bool:
 # Trial engine
 # --------------------------------------------------------------------------- #
 
+def _has_fused_option(optimizer: Union[str, Callable]) -> bool:
+    return isinstance(optimizer, str) and optimizer.lower() in ("adam", "adamw")
+
+
 def _make_optimizer(optimizer: Union[str, Callable], params, lr: float, fused: bool):
+    # A config labelled fused must have run a fused optimizer, so a fused
+    # request that cannot be honoured raises instead of falling back.
+    if fused and not _has_fused_option(optimizer):
+        raise ValueError(f"no fused implementation is searched for optimizer {optimizer!r}")
     if callable(optimizer) and not isinstance(optimizer, str):
         return optimizer(params)
     name = optimizer.lower()
     if name in ("adamw", "adam"):
         cls = torch.optim.AdamW if name == "adamw" else torch.optim.Adam
-        if fused:
-            try:
-                return cls(params, lr=lr, fused=True)
-            except Exception:
-                pass
-        return cls(params, lr=lr)
+        return cls(params, lr=lr, fused=True) if fused else cls(params, lr=lr)
     if name == "sgd":
         return torch.optim.SGD(params, lr=lr, momentum=0.9)
     raise ValueError(f"unknown optimizer {optimizer!r}")
+
+
+def _fused_opt_unavailable(optimizer: Union[str, Callable], model: nn.Module,
+                           lr: float) -> Optional[str]:
+    """Why the fused-optimizer knob cannot be searched, or None if it can."""
+    if not _has_fused_option(optimizer):
+        return "only the built-in 'adam'/'adamw' optimizers have a fused option"
+    if not _supports_fused_opt():
+        return "needs a CUDA GPU with compute capability 7.0 or newer"
+    try:
+        _make_optimizer(optimizer, model.parameters(), lr, fused=True)
+    except Exception as e:
+        return f"fused {optimizer} failed to build ({type(e).__name__}: {str(e)[:80]})"
+    return None
+
+
+def _optimizer_id(optimizer: Union[str, Callable], model: nn.Module) -> str:
+    """Cache identity of the optimizer: the built-in name, or for a factory
+    the class and hyperparameters of the optimizer it builds (names alone
+    collide, e.g. every functools.partial or two lambdas in one scope)."""
+    if isinstance(optimizer, str):
+        return optimizer.lower()
+    opt = optimizer(model.parameters())
+    names = {id(p): n for n, p in model.named_parameters()}
+    groups = [{**{k: v for k, v in g.items() if k != "params"},
+               "params": [names.get(id(p), "?") for p in g["params"]]}
+              for g in opt.param_groups]
+    return f"{type(opt).__module__}.{type(opt).__qualname__}:{groups!r}"
 
 
 def _compute_loss(out, batch: "_Batch", loss_fn):
@@ -374,6 +407,7 @@ def _build_step(model: nn.Module, cfg: TrialConfig, batch: "_Batch", loss_fn,
             opt.step()
         return loss
 
+    step.scaler = scaler
     return step
 
 
@@ -381,11 +415,18 @@ def _time_step_fn(step, device: str, min_chunk_s: float = 0.2,
                   max_warm_steps: int = 80) -> Tuple[float, float]:
     """Warm up until per-step time stabilises (this absorbs compilation and
     CUDA-graph capture; its wall time is returned as compile/warmup cost),
-    then time 3 chunks and return (median ms/step, warmup_s)."""
+    then time 3 chunks and return (median ms/step, warmup_s).
+
+    For fp16 steps (``step.scaler`` is their GradScaler), warmup also waits
+    until the loss scale stops falling, and the candidate is rejected if the
+    timed chunks skipped more optimizer steps than scale growth accounts for.
+    """
     cuda = device.startswith("cuda")
+    scaler = getattr(step, "scaler", None)
 
     warm_t0 = time.time()
     recent: List[float] = []
+    scales = [scaler.get_scale()] if scaler is not None else []
     for i in range(max_warm_steps):
         t0 = time.time()
         loss = step()
@@ -394,12 +435,18 @@ def _time_step_fn(step, device: str, min_chunk_s: float = 0.2,
         recent.append(time.time() - t0)
         if not torch.isfinite(loss.detach()).all():
             raise FloatingPointError("non-finite loss during warmup")
-        if i >= 9 and max(recent[-3:]) < 1.5 * min(recent[-3:]):
+        if scaler is not None:
+            scales.append(scaler.get_scale())
+        # A skipped step halves the scale and growth needs 2000 clean steps,
+        # so a scale no lower than 3 steps ago means none of them was skipped.
+        settled = scaler is None or (len(scales) > 3 and scales[-1] >= scales[-4])
+        if i >= 9 and settled and max(recent[-3:]) < 1.5 * min(recent[-3:]):
             break
     warm_s = time.time() - warm_t0
 
     per_step = statistics.median(recent[-3:])
     n = max(3, int(math.ceil(min_chunk_s / max(per_step, 1e-4))))
+    scale_before = scaler.get_scale() if scaler is not None else None
     chunk_ms: List[float] = []
     for _ in range(3):
         if cuda:
@@ -412,6 +459,14 @@ def _time_step_fn(step, device: str, min_chunk_s: float = 0.2,
         chunk_ms.append((time.time() - t0) / n * 1000)
         if not torch.isfinite(loss.detach()).all():
             raise FloatingPointError("non-finite loss during measurement")
+    if scaler is not None:
+        # Each skip halves the scale and each growth (after 2000 unskipped
+        # steps) doubles it, so a lower scale means skips outnumbered growths.
+        scale_after = scaler.get_scale()
+        if scale_after < scale_before:
+            raise FloatingPointError(
+                f"fp16 GradScaler skipped optimizer steps during measurement "
+                f"(loss scale {scale_before:g} -> {scale_after:g})")
     return statistics.median(chunk_ms), warm_s
 
 
@@ -491,7 +546,8 @@ def autotune(
 
     # Cache short-circuit
     from . import cache as _cache
-    cache_key = _cache.make_key(model, batch.signature(), device) if cache else None
+    cache_key = (_cache.make_key(model, batch.signature(), device,
+                                 optimizer=_optimizer_id(optimizer, model)) if cache else None)
     if cache is True and cache_key:
         hit = _cache.load(cache_key)
         if hit is not None:
@@ -507,7 +563,10 @@ def autotune(
     snapshot = {k: v.detach().to("cpu", copy=True) for k, v in model.state_dict().items()}
 
     cnn = _is_cnn(model) and batch.channels_last_ok()
-    fused_ok = _supports_fused_opt()
+    fused_unavailable = _fused_opt_unavailable(optimizer, model, lr)
+    fused_ok = fused_unavailable is None
+    if fused_unavailable:
+        env["fused_opt_not_searched"] = fused_unavailable
 
     def trial(cfg: TrialConfig, est_s: float) -> Optional[TrialResult]:
         if remaining() < est_s:
@@ -527,6 +586,8 @@ def autotune(
     if verbose:
         print(f"autotune: searching on {env.get('gpu_name', device)} "
               f"(budget {budget_s:.0f}s)")
+        if fused_unavailable:
+            print(f"autotune: fused optimizer not searched - {fused_unavailable}")
 
     # Stage 1: the baseline. Everything is measured against this.
     base_cfg = TrialConfig()

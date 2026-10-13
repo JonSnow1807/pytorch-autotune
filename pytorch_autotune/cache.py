@@ -21,7 +21,7 @@ _CACHE_PATH = Path(os.environ.get(
 ))
 
 
-def make_key(model, batch_signature: str, device: str) -> str:
+def make_key(model, batch_signature: str, device: str, optimizer: str = "") -> str:
     from . import __version__
     # Structural digest: two different architectures must never share a key,
     # even with equal class names and parameter counts (a plain param-count
@@ -35,6 +35,7 @@ def make_key(model, batch_signature: str, device: str) -> str:
         torch.cuda.get_device_name() if device.startswith("cuda") and torch.cuda.is_available() else device,
         torch.__version__,
         __version__,
+        optimizer,
     ]
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:24]
 
