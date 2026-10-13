@@ -349,7 +349,10 @@ def _optimizer_id(optimizer: Union[str, Callable], model: nn.Module) -> str:
     if isinstance(optimizer, str):
         return optimizer.lower()
     opt = optimizer(model.parameters())
-    groups = [{k: v for k, v in g.items() if k != "params"} for g in opt.param_groups]
+    names = {id(p): n for n, p in model.named_parameters()}
+    groups = [{**{k: v for k, v in g.items() if k != "params"},
+               "params": [names.get(id(p), "?") for p in g["params"]]}
+              for g in opt.param_groups]
     return f"{type(opt).__module__}.{type(opt).__qualname__}:{groups!r}"
 
 

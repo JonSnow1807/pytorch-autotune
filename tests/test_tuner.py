@@ -321,6 +321,14 @@ def test_cache_key_distinguishes_optimizers():
     assert len({at_cache.make_key(m, sig, "cpu", optimizer=i) for i in ids}) == len(specs) - 1
     # partial(AdamW) and the plain AdamW lambda build the same optimizer.
     assert ids[2] == ids[4]
+    # Same group options, different parameters in each group.
+    by_kind = lambda ps: torch.optim.AdamW([  # noqa: E731
+        {"params": [m[0].weight, m[2].weight], "weight_decay": 0.1},
+        {"params": [m[0].bias, m[2].bias], "weight_decay": 0.0}])
+    by_layer = lambda ps: torch.optim.AdamW([  # noqa: E731
+        {"params": [m[0].weight, m[0].bias], "weight_decay": 0.1},
+        {"params": [m[2].weight, m[2].bias], "weight_decay": 0.0}])
+    assert _optimizer_id(by_kind, m) != _optimizer_id(by_layer, m)
 
 
 @requires_cuda
