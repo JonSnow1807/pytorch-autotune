@@ -1,0 +1,1398 @@
+{
+ "metadata": {
+  "timestamp": "2026-10-13T17:24:33+00:00",
+  "gpu_name": "NVIDIA H100 80GB HBM3",
+  "torch": "2.13.0+cu129",
+  "python": "3.12.11",
+  "budget": "max",
+  "gpu_clock_state": "1755 MHz, 1980 MHz, Disabled",
+  "cache_protocol": "each row and search in a fresh process with its own empty Inductor/Triton/CUDA cache dirs; search_warm reuses search_cold's dirs",
+  "git_commit": "dd2f1a17d1399663f0e93306628ef1aba4997f1c",
+  "git_dirty": false
+ },
+ "results": {
+  "resnet50_224px_b64": {
+   "strict_fp32_eager": {
+    "ms_per_step": 88.43,
+    "warmup_s": 1.3,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": true
+   },
+   "pytorch_default_fp32_eager": {
+    "ms_per_step": 38.74,
+    "warmup_s": 0.9,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "plain_compile_default_fp32": {
+    "ms_per_step": 25.18,
+    "warmup_s": 33.1,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "default",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "expert_config": {
+    "ms_per_step": 14.97,
+    "warmup_s": 45.2,
+    "config": {
+     "precision": "amp_bf16",
+     "compile": "default",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "strict_fp32": false
+   },
+   "autotuned": {
+    "ms_per_step": 13.264290491739908,
+    "config": {
+     "precision": "amp_fp16",
+     "compile": "max-autotune",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "compile_s": 190.01584601402283,
+    "search_s": 517.1
+   },
+   "trials": [
+    {
+     "config": {
+      "precision": "fp32_default",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 38.70626290639242,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 28.540100370134628,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 19.601869583129883,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 17.50633933327415,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "default",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 14.717468848595253,
+     "compile_s": 34.4958758354187,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "default",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 14.911376512967625,
+     "compile_s": 31.59725570678711,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 13.931053025381905,
+     "compile_s": 28.804837703704834,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 14.156256403241839,
+     "compile_s": 29.53323245048523,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "max-autotune",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 13.264290491739908,
+     "compile_s": 190.01584601402283,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "max-autotune",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 13.430578368050712,
+     "compile_s": 154.010803937912,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "max-autotune",
+      "channels_last": true,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 15.861272811889648,
+     "compile_s": 3.3914635181427,
+     "note": ""
+    }
+   ],
+   "search_cold": {
+    "ms_per_step": 13.264290491739908,
+    "config": {
+     "precision": "amp_fp16",
+     "compile": "max-autotune",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "compile_s": 190.01584601402283,
+    "search_s": 517.1,
+    "trials": [
+     {
+      "config": {
+       "precision": "fp32_default",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 38.70626290639242,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 28.540100370134628,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 19.601869583129883,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 17.50633933327415,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "default",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 14.717468848595253,
+      "compile_s": 34.4958758354187,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "default",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 14.911376512967625,
+      "compile_s": 31.59725570678711,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 13.931053025381905,
+      "compile_s": 28.804837703704834,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 14.156256403241839,
+      "compile_s": 29.53323245048523,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "max-autotune",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 13.264290491739908,
+      "compile_s": 190.01584601402283,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "max-autotune",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 13.430578368050712,
+      "compile_s": 154.010803937912,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "max-autotune",
+       "channels_last": true,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 15.861272811889648,
+      "compile_s": 3.3914635181427,
+      "note": ""
+     }
+    ]
+   },
+   "search_warm": {
+    "ms_per_step": 13.209915161132812,
+    "config": {
+     "precision": "amp_fp16",
+     "compile": "max-autotune",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "compile_s": 2.8089871406555176,
+    "search_s": 53.8,
+    "trials": [
+     {
+      "config": {
+       "precision": "fp32_default",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 38.70892524719238,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 28.4902708871024,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 19.57004720514471,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 16.111751397450764,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "default",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 14.610492266141453,
+      "compile_s": 2.791292190551758,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "default",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 14.885663986206055,
+      "compile_s": 1.9444892406463623,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 13.84387697492327,
+      "compile_s": 2.057382583618164,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 14.094063213893346,
+      "compile_s": 1.738901138305664,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "max-autotune",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 13.209915161132812,
+      "compile_s": 2.8089871406555176,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "max-autotune",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 13.360865910847982,
+      "compile_s": 23.520480155944824,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "max-autotune",
+       "channels_last": true,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 15.699771734384392,
+      "compile_s": 2.582031488418579,
+      "note": ""
+     }
+    ]
+   },
+   "speedup_vs_strict_fp32": 6.67,
+   "speedup_vs_pytorch_default": 2.92,
+   "speedup_vs_plain_compile": 1.9,
+   "speedup_vs_expert_config": 1.13
+  },
+  "resnet18_32px_b128": {
+   "strict_fp32_eager": {
+    "ms_per_step": 6.85,
+    "warmup_s": 0.5,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": true
+   },
+   "pytorch_default_fp32_eager": {
+    "ms_per_step": 6.13,
+    "warmup_s": 0.5,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "plain_compile_default_fp32": {
+    "ms_per_step": 5.39,
+    "warmup_s": 13.7,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "default",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "expert_config": {
+    "ms_per_step": 4.77,
+    "warmup_s": 19.8,
+    "config": {
+     "precision": "amp_bf16",
+     "compile": "default",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "strict_fp32": false
+   },
+   "autotuned": {
+    "ms_per_step": 1.8920715038593,
+    "config": {
+     "precision": "tf32",
+     "compile": "reduce-overhead",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "compile_s": 8.422833681106567,
+    "search_s": 78.2
+   },
+   "trials": [
+    {
+     "config": {
+      "precision": "fp32_default",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 5.816119057791574,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 5.435245793040205,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 6.360401426042829,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "off",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 6.096090589250837,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "default",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 4.621244058376405,
+     "compile_s": 12.862409830093384,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "default",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 5.496561527252197,
+     "compile_s": 11.584105730056763,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 1.8920715038593,
+     "compile_s": 8.422833681106567,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 2.574069683368389,
+     "compile_s": 9.867398023605347,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "reduce-overhead",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 2.1765372332404644,
+     "compile_s": 11.137648344039917,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "reduce-overhead",
+      "channels_last": true,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 2.4060975937616256,
+     "compile_s": 0.692246675491333,
+     "note": ""
+    }
+   ],
+   "search_cold": {
+    "ms_per_step": 1.8920715038593,
+    "config": {
+     "precision": "tf32",
+     "compile": "reduce-overhead",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "compile_s": 8.422833681106567,
+    "search_s": 78.2,
+    "trials": [
+     {
+      "config": {
+       "precision": "fp32_default",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 5.816119057791574,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.435245793040205,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 6.360401426042829,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 6.096090589250837,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "default",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 4.621244058376405,
+      "compile_s": 12.862409830093384,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "default",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.496561527252197,
+      "compile_s": 11.584105730056763,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 1.8920715038593,
+      "compile_s": 8.422833681106567,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 2.574069683368389,
+      "compile_s": 9.867398023605347,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "reduce-overhead",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 2.1765372332404644,
+      "compile_s": 11.137648344039917,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 2.4060975937616256,
+      "compile_s": 0.692246675491333,
+      "note": ""
+     }
+    ]
+   },
+   "search_warm": {
+    "ms_per_step": 1.8523062268892925,
+    "config": {
+     "precision": "tf32",
+     "compile": "reduce-overhead",
+     "channels_last": true,
+     "fused_opt": true
+    },
+    "compile_s": 0.7275519371032715,
+    "search_s": 16.1,
+    "trials": [
+     {
+      "config": {
+       "precision": "fp32_default",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 6.179592188666849,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.475484407865084,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.963193045722114,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "off",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.887229101998465,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "default",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 4.775939843593499,
+      "compile_s": 1.5603649616241455,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "default",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.338832310267858,
+      "compile_s": 0.9018392562866211,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 1.8523062268892925,
+      "compile_s": 0.7275519371032715,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 2.404413572171839,
+      "compile_s": 0.8621330261230469,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "reduce-overhead",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 2.15923923185502,
+      "compile_s": 0.7512588500976562,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "reduce-overhead",
+       "channels_last": true,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 2.3283596280254897,
+      "compile_s": 0.6867153644561768,
+      "note": ""
+     }
+    ]
+   },
+   "speedup_vs_strict_fp32": 3.62,
+   "speedup_vs_pytorch_default": 3.24,
+   "speedup_vs_plain_compile": 2.85,
+   "speedup_vs_expert_config": 2.52
+  },
+  "transformer_6l_s128_b32": {
+   "strict_fp32_eager": {
+    "ms_per_step": 16.22,
+    "warmup_s": 0.4,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": true
+   },
+   "pytorch_default_fp32_eager": {
+    "ms_per_step": 16.24,
+    "warmup_s": 0.4,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "off",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "plain_compile_default_fp32": {
+    "ms_per_step": 14.61,
+    "warmup_s": 11.2,
+    "config": {
+     "precision": "fp32_default",
+     "compile": "default",
+     "channels_last": false,
+     "fused_opt": false
+    },
+    "strict_fp32": false
+   },
+   "expert_config": {
+    "ms_per_step": 5.31,
+    "warmup_s": 12.5,
+    "config": {
+     "precision": "amp_bf16",
+     "compile": "default",
+     "channels_last": false,
+     "fused_opt": true
+    },
+    "strict_fp32": false
+   },
+   "autotuned": {
+    "ms_per_step": 2.6494246810229853,
+    "config": {
+     "precision": "amp_fp16",
+     "compile": "reduce-overhead",
+     "channels_last": false,
+     "fused_opt": true
+    },
+    "compile_s": 8.279338598251343,
+    "search_s": 111.8
+   },
+   "trials": [
+    {
+     "config": {
+      "precision": "fp32_default",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 16.282063264113205,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 8.507092793782553,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_bf16",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 9.711106618245443,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "off",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 9.585440158843994,
+     "compile_s": 0.0,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "default",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 5.574260439191546,
+     "compile_s": 10.762096405029297,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "default",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 5.910003507459486,
+     "compile_s": 9.045307159423828,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "tf32",
+      "compile": "reduce-overhead",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 4.867283921492727,
+     "compile_s": 7.142503499984741,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "reduce-overhead",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 2.6494246810229853,
+     "compile_s": 8.279338598251343,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "max-autotune",
+      "channels_last": false,
+      "fused_opt": true
+     },
+     "status": "ok",
+     "ms_per_step": 2.733640983456471,
+     "compile_s": 66.15684676170349,
+     "note": ""
+    },
+    {
+     "config": {
+      "precision": "amp_fp16",
+      "compile": "reduce-overhead",
+      "channels_last": false,
+      "fused_opt": false
+     },
+     "status": "ok",
+     "ms_per_step": 4.1239538858103195,
+     "compile_s": 0.991504430770874,
+     "note": ""
+    }
+   ],
+   "search_cold": {
+    "ms_per_step": 2.6494246810229853,
+    "config": {
+     "precision": "amp_fp16",
+     "compile": "reduce-overhead",
+     "channels_last": false,
+     "fused_opt": true
+    },
+    "compile_s": 8.279338598251343,
+    "search_s": 111.8,
+    "trials": [
+     {
+      "config": {
+       "precision": "fp32_default",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 16.282063264113205,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 8.507092793782553,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 9.711106618245443,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 9.585440158843994,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "default",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.574260439191546,
+      "compile_s": 10.762096405029297,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "default",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.910003507459486,
+      "compile_s": 9.045307159423828,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "reduce-overhead",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 4.867283921492727,
+      "compile_s": 7.142503499984741,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "reduce-overhead",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 2.6494246810229853,
+      "compile_s": 8.279338598251343,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "max-autotune",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 2.733640983456471,
+      "compile_s": 66.15684676170349,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "reduce-overhead",
+       "channels_last": false,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 4.1239538858103195,
+      "compile_s": 0.991504430770874,
+      "note": ""
+     }
+    ]
+   },
+   "search_warm": {
+    "ms_per_step": 2.498464307923248,
+    "config": {
+     "precision": "amp_bf16",
+     "compile": "reduce-overhead",
+     "channels_last": false,
+     "fused_opt": true
+    },
+    "compile_s": 7.6304779052734375,
+    "search_s": 89.5,
+    "trials": [
+     {
+      "config": {
+       "precision": "fp32_default",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 16.389906406402588,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 8.394730718512283,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 9.559247228834364,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_fp16",
+       "compile": "off",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 9.97202019942434,
+      "compile_s": 0.0,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "default",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.681382285224067,
+      "compile_s": 1.605656623840332,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "default",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 5.996011197566986,
+      "compile_s": 10.004808902740479,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "tf32",
+       "compile": "reduce-overhead",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 4.875580469767253,
+      "compile_s": 0.8202264308929443,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "reduce-overhead",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 2.498464307923248,
+      "compile_s": 7.6304779052734375,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "max-autotune",
+       "channels_last": false,
+       "fused_opt": true
+      },
+      "status": "ok",
+      "ms_per_step": 2.504186024741521,
+      "compile_s": 60.657349824905396,
+      "note": ""
+     },
+     {
+      "config": {
+       "precision": "amp_bf16",
+       "compile": "reduce-overhead",
+       "channels_last": false,
+       "fused_opt": false
+      },
+      "status": "ok",
+      "ms_per_step": 3.193645154015493,
+      "compile_s": 1.0429859161376953,
+      "note": ""
+     }
+    ]
+   },
+   "speedup_vs_strict_fp32": 6.12,
+   "speedup_vs_pytorch_default": 6.13,
+   "speedup_vs_plain_compile": 5.51,
+   "speedup_vs_expert_config": 2.0
+  }
+ }
+}

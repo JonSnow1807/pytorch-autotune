@@ -61,3 +61,33 @@ matched); "within 4% of optimal" is now stated as "within 4% of the
 tuner's pick" with the raw-fastest trial and noise-floor rule spelled out;
 and the falsification drift is quoted per-model (−0.1%/+1.3%/+1.5%,
 i.e. ≤1.6% allowing for rounding) instead of a flat "within 1.5%".
+
+## Follow-up (2026-10-13): findings 1, 7 and 11 revisited, one new finding
+
+These fixes are in the CHANGELOG's Unreleased entry. The new measurements are
+in `../2026-10-13_h100-80gb_dd2f1a1/`.
+
+* **Finding 1, previously refuted (fp16 trials flattered by skipped GradScaler
+  steps).**
+  F3 refuted it for one workload, the ResNet-50 winner, but nothing in the
+  tuner rejected such candidates. The tuner now does. Warmup waits for the
+  loss scale to settle. A candidate whose scale ends the timed chunks lower
+  than it started is disqualified, because that means skipped steps
+  outnumbered scale growths.
+* **Finding 7, previously refuted (warm caches).** The mechanics were
+  correct, but the reporting was not:
+  * The committed search times (12–83 s) and max-autotune compile times
+    (1.0–9.5 s) match warm caches.
+  * Cold max-autotune trials took 61–190 s on an H100.
+  * `suite.py` now measures each search cold and warm, in fresh processes with
+    their own cache directories.
+* **Finding 11, previously refuted ("max-autotune compiles can take 1–4
+  min"): the claim holds, but its cited support did not.** The verdict said
+  the committed compile_s values supported the claim, but they are 9.5 s,
+  2.4 s and 1.0 s. The H100 cold run supports the claim: 61–190 s.
+* **New finding: "fused" labels on trials whose optimizer was not fused.**
+  * `"sgd"` and optimizer factories ignore the fused option.
+  * A failed fused construction fell back silently.
+  * Fixed: the knob is searched only where a fused optimizer is actually
+    built.
+  * The committed results used AdamW, so their labels were accurate.
