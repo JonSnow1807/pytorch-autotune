@@ -226,8 +226,11 @@ list:
 - added a new finding: "fused" labels on trials whose optimizer was not fused.
 
 The fixes are in the tuner and the benchmark suite. The tuner now
-disqualifies any fp16 candidate that skipped optimizer steps while it was
-being timed, so the zero-skip result above no longer rests on one workload.
+disqualifies an fp16 candidate whose loss scale ends its timed chunks lower
+than it started, i.e. whose skipped optimizer steps outnumber GradScaler's
+scale growths. A timing window shorter than the 2000-step growth interval has
+no growths, so there this means any skipped step. The zero-skip result above
+no longer rests on one workload.
 
 ### Caveats you should actually read
 
@@ -261,7 +264,8 @@ leave up to 2.7× unclaimed, which is why `autotune()` exists.
 `pytest tests -q` — tuner behavior on GPU:
 - the baseline guarantee;
 - disqualification of non-finite, OOM and compile-failure candidates, and of
-  fp16 candidates whose GradScaler skipped timed steps;
+  fp16 candidates whose skipped timed steps outnumber GradScaler's scale
+  growths;
 - "fused" labels only on trials that ran a fused optimizer;
 - state restoration, the cache and budget accounting.
 

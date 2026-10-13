@@ -342,11 +342,15 @@ def _fused_opt_unavailable(optimizer: Union[str, Callable], model: nn.Module,
     return None
 
 
-def _optimizer_id(optimizer: Union[str, Callable]) -> str:
+def _optimizer_id(optimizer: Union[str, Callable], model: nn.Module) -> str:
+    """Cache identity of the optimizer: the built-in name, or for a factory
+    the class and hyperparameters of the optimizer it builds (names alone
+    collide, e.g. every functools.partial or two lambdas in one scope)."""
     if isinstance(optimizer, str):
         return optimizer.lower()
-    name = getattr(optimizer, "__qualname__", type(optimizer).__name__)
-    return f"{getattr(optimizer, '__module__', '')}.{name}"
+    opt = optimizer(model.parameters())
+    groups = [{k: v for k, v in g.items() if k != "params"} for g in opt.param_groups]
+    return f"{type(opt).__module__}.{type(opt).__qualname__}:{groups!r}"
 
 
 def _compute_loss(out, batch: "_Batch", loss_fn):
@@ -540,7 +544,7 @@ def autotune(
     # Cache short-circuit
     from . import cache as _cache
     cache_key = (_cache.make_key(model, batch.signature(), device,
-                                 optimizer=_optimizer_id(optimizer)) if cache else None)
+                                 optimizer=_optimizer_id(optimizer, model)) if cache else None)
     if cache is True and cache_key:
         hit = _cache.load(cache_key)
         if hit is not None:

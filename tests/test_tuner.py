@@ -1,6 +1,7 @@
 """Tests for the measurement-driven tuner (GPU tests auto-skip without CUDA)."""
 
 import copy
+import functools
 
 import pytest
 import torch
@@ -9,7 +10,7 @@ import torch.nn as nn
 from pytorch_autotune import TrialConfig, autotune
 from pytorch_autotune import cache as at_cache
 from pytorch_autotune.tuner import (
-    Report, TrialResult, _env_metadata, _make_optimizer, _time_step_fn,
+    Report, TrialResult, _env_metadata, _make_optimizer, _optimizer_id, _time_step_fn,
 )
 
 requires_cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
@@ -307,10 +308,19 @@ def test_fused_request_is_never_dropped_silently(monkeypatch):
 
 
 def test_cache_key_distinguishes_optimizers():
+    # A cached config must not be reused for a different optimizer, including
+    # factories whose names collide (every functools.partial, two lambdas).
     m = tiny_mlp()
     sig = "(4, 64):torch.float32"
-    keys = {at_cache.make_key(m, sig, "cpu", optimizer=o) for o in ("adamw", "sgd")}
-    assert len(keys) == 2
+    specs = ["adamw", "sgd",
+             functools.partial(torch.optim.AdamW, lr=1e-3),
+             functools.partial(torch.optim.SGD, lr=1e-3),
+             lambda ps: torch.optim.AdamW(ps, lr=1e-3),
+             lambda ps: torch.optim.AdamW(ps, lr=1e-3, amsgrad=True)]
+    ids = [_optimizer_id(s, m) for s in specs]
+    assert len({at_cache.make_key(m, sig, "cpu", optimizer=i) for i in ids}) == len(specs) - 1
+    # partial(AdamW) and the plain AdamW lambda build the same optimizer.
+    assert ids[2] == ids[4]
 
 
 @requires_cuda

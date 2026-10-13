@@ -21,7 +21,9 @@
   growths. The pre-release falsification run found zero skips for the
   committed fp16 winner (F3); the tuner now checks every fp16 candidate.
 * Cached configs are keyed by optimizer as well, so a result measured with
-  one optimizer is not reused for another.
+  one optimizer is not reused for another. A factory is keyed by the class
+  and hyperparameters of the optimizer it builds, because names collide (every
+  `functools.partial`, or two lambdas in one scope).
 
 ### Benchmarks
 
